@@ -36,11 +36,27 @@ def search(collection):
         if collection == "sessions":
             start_time = request.args.get("time_range_start")
             if start_time:
+                print(start_time)
+                if start_time == "now":
+                    start_time = time.time()
+                elif start_time.startswith("+"):
+                    start_time = time.time() + float(start_time.split("+")[1])
+                elif start_time.startswith("-"):
+                    start_time = time.time() - float(start_time.split("-")[1])
+                print(start_time)
                 results = list(filter(lambda x: x.start_time.timestamp() >= float(start_time), results))
             end_time = request.args.get("time_range_end")
             if end_time:
+                if end_time == "now":
+                    end_time = time.time()
+                elif end_time.startswith("+"):
+                    end_time = time.time() + float(end_time.split("+")[1])
+                elif end_time.startswith("-"):
+                    end_time = time.time() - float(end_time.split("-")[1])
                 results = list(filter(lambda x: x.end_time.timestamp() <= float(end_time), results))
         filtered = [x.serialize() for x in results]
+        if not filtered:
+            return jsonify([])
         prototype = filtered[0]
         for key in prototype.keys():
             if key in request.args:

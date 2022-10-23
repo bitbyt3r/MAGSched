@@ -13,7 +13,27 @@ services:
     depends_on:
       - redis
     environment:
-      BACKENDS:  "[]"
+      # You'll have to populate this with secrets for each backend
+      #
+      # Guidebook needs an API key and a guide ID
+      # Google needs an app API key, a Sheet ID (from the url of the sheet), and a credentials object in a nested json string.
+      # If the credentials key is left blank it will prompt you interactively to create it, and shove it into redis for later use.
+      BACKENDS: |
+        [
+          {
+            "name": "Test Guidebook",
+            "type": "guidebook",
+            "apikey": "",
+            "guide": ""
+          },
+          {
+            "name": "Google Sheet",
+            "type": "sheets",
+            "key": "",
+            "sheet": "",
+            "credentials": ""
+          }
+        ]
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
       REDIS_DB: "0"
