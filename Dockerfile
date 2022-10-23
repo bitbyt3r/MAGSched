@@ -3,6 +3,7 @@ FROM python:alpine
 RUN pip install --upgrade flask redis requests google-api-python-client google-auth-httplib2 google-auth-oauthlib gunicorn
 
 ADD backends/ backends/
+ADD templates/ templates/
 ADD cache_loader.py cache_loader.py
 ADD config.py config.py
 ADD database.py database.py
