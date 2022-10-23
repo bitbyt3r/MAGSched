@@ -43,6 +43,8 @@ class Sheets_Backend():
                 flow = InstalledAppFlow.from_client_config(self.credentials, SCOPES)
                 creds = flow.run_local_server(port=0)
         database.db.set(f"SHEETS-{self.sheet}", creds.to_json())
+        print("Google Sheets Creds:")
+        print(creds.to_json())
 
         self.service = build("sheets", "v4", credentials=creds)
 

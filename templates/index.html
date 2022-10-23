@@ -1,0 +1,162 @@
+<h1 id="magsched">MAGSched</h1>
+<p>Schedule caching server supporting multiple upstreams.</p>
+<p>The main goal is to avoid having any API usage limits that external providers impose by self hosting a local copy of the schedule. Additionally, it provides a very simple interface for downstream consumers.</p>
+<h2 id="configuration">Configuration</h2>
+<p>The following environment variables are used to configure the backend:</p>
+<ul>
+<li>REDIS_HOST - The IP/hostname of the redis instance</li>
+<li>REDIS_PORT - The port to use for redis</li>
+<li>REDIS_DB - The DB number to use for redis (generally a number from 0-15)</li>
+<li>REFRESH_DELAY - How long to wait between backend polls</li>
+<li>BACKENDS - A json string specifying which backend services to pull from in ascending order of priority</li>
+</ul>
+<p>BACKENDS takes a list of objects in this format:</p>
+<pre><code class="language-json">[
+    {
+        &quot;name&quot;: &quot;Test Guidebook&quot;,
+        &quot;type&quot;: &quot;guidebook&quot;,
+        &quot;apikey&quot;: &quot;aaaabbbbccccddddeeeeffff.aaaabbbbccccddddeeeeffff&quot;,
+        &quot;guide&quot;: &quot;183391&quot;
+    },
+    {
+        &quot;name&quot;: &quot;Google Sheet&quot;,
+        &quot;type&quot;: &quot;sheets&quot;,
+        &quot;sheet&quot;: &quot;1dTp07uGTokckyXtNUGLRnK634twzaaKUF0Rp8XQGl20&quot;,
+        &quot;key&quot;: &quot;aaaabbbbccccddddeeeeffff&quot;,
+        &quot;credentials&quot;: &quot;&quot;
+    }
+]
+</code></pre>
+<p>Currently, <code>sheets</code> and <code>guidebook</code> types are supported. Data pulled from services later in the list of backends will override data from earlier ones if they contain the same IDs. In this example, you could use Google Sheets to add or edit schedule entries from Guidebook.</p>
+<h3 id="guidebook-configuration">Guidebook Configuration</h3>
+<p>Guidebook requires an API key and a guide number, both as strings. Guidebook does not have permissions controls on API keys, so be very careful with them.</p>
+<h3 id="google-sheets-configuration">Google Sheets Configuration</h3>
+<p>Google sheets requires a sheet ID which can be pulled from the URL of a sheet.</p>
+<p>Additionally it requires a Google developer API key. See <a href="https://developers.google.com/sheets/api/quickstart/python">https://developers.google.com/sheets/api/quickstart/python</a> for docs on setting up a key for this.</p>
+<p>Finally, sheets requires credentials that have been authorized to access the user&#39;s account. If you start the server locally with credentials set to an empty string it will launch a browser window interactively to allow you to authorize it to access sheets on your account. Once that is complete, it will save the session key to the database and continually refresh it. It will also print out the value needed for this variable so that you can copy it to a remote server. If this server gets any serious use I&#39;ll probably implement the flow server side, but it should be at most a once per year thing.</p>
+<h2 id="api">API</h2>
+<p>The REST API has the following endpoints:</p>
+<h3 id="get-sessions">GET /sessions</h3>
+<p>Returns a list of sessions that are scheduled.</p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>offset</td>
+<td>0</td>
+<td>Pagination Offset</td>
+</tr>
+<tr>
+<td>limit</td>
+<td>10</td>
+<td>Pagination Result Limit (Set to 0 to get all results)</td>
+</tr>
+<tr>
+<td>sort</td>
+<td>start_time</td>
+<td>Set to the name of any key to sort results by that key</td>
+</tr>
+<tr>
+<td>time_range_start</td>
+<td></td>
+<td>Allows you to filter results to a window of time. See below.</td>
+</tr>
+<tr>
+<td>time_range_end</td>
+<td></td>
+<td>Allows you to filter results to a window of time. See below.</td>
+</tr>
+<tr>
+<td>reverse</td>
+<td>false</td>
+<td>Reverse the sort order.</td>
+</tr>
+<tr>
+<td>id</td>
+<td></td>
+<td>Filter results to match an exact ID</td>
+</tr>
+<tr>
+<td>name</td>
+<td></td>
+<td>Filter results to match an exact name</td>
+</tr>
+<tr>
+<td>start_time</td>
+<td></td>
+<td>Filter results to match an exact start_time</td>
+</tr>
+<tr>
+<td>end_time</td>
+<td></td>
+<td>Filter results to match an exact end_time</td>
+</tr>
+<tr>
+<td>all_day</td>
+<td></td>
+<td>Filter results by whether they are All Day events (TRUE/FALSE)</td>
+</tr>
+<tr>
+<td>description</td>
+<td></td>
+<td>Filter results to match an exact description</td>
+</tr>
+<tr>
+<td>locations</td>
+<td></td>
+<td>Filter results by whether they include a location in their list</td>
+</tr>
+<tr>
+<td>schedule_tracks</td>
+<td></td>
+<td>Filter results by whether they include a track in their list</td>
+</tr>
+</tbody></table>
+<p><code>time_range_start</code> and <code>time_range_end</code> allow you to request results from a range of time. You can specify the endpoints in a few ways.</p>
+<p>Each end of the range can be:</p>
+<ul>
+<li>A unix epoch timestamp</li>
+<li>The literal word &quot;now&quot;</li>
+<li>A relative number of seconds to now with a +/- sign in front</li>
+</ul>
+<p>To get the next hour of events use <code>time_range_start=now&amp;time_range_end=+3600</code> for example. To get events starting one hour ago until the end of the schedule use <code>time_range_start=-3600</code>.</p>
+<h3 id="get-sessions-1">GET /sessions/<id></h3>
+<p>Returns a single session object by ID:</p>
+<pre><code class="language-json">{
+  &quot;all_day&quot;: false, 
+  &quot;description&quot;: &quot;&lt;p&gt; Come hang out as we start the show! Maybe donate some money to Child&#39;s Play while you&#39;re here. &lt;/p&gt;&quot;, 
+  &quot;end_time&quot;: &quot;2022-01-06T17:00:00+00:00&quot;, 
+  &quot;id&quot;: &quot;27441254&quot;, 
+  &quot;locations&quot;: [
+    &quot;3994633&quot;
+  ], 
+  &quot;name&quot;: &quot;magFAST Opening Ceremonies&quot;, 
+  &quot;start_time&quot;: &quot;2022-01-06T16:30:00+00:00&quot;, 
+  &quot;tracks&quot;: [
+    &quot;530637&quot;
+  ]
+}
+</code></pre>
+<h3 id="get-locations">GET /locations</h3>
+<p>Returns a list of locations, uses same sorting and filtering as sessions.</p>
+<h3 id="get-locations-1">GET /locations/<id></h3>
+<p>Returns a single location by ID:</p>
+<pre><code class="language-json">{
+    &quot;id&quot;: &quot;3985248&quot;, 
+    &quot;name&quot;: &quot;Annapolis 2-4 (Panels 4)&quot;
+}
+</code></pre>
+<h3 id="get-tracks">GET /tracks</h3>
+<p>Returns a list of tracks, uses same sorting and filtering as sessions.</p>
+<h3 id="get-tracks-1">GET /tracks/<id></h3>
+<p>Returns a single track by ID:</p>
+<pre><code class="language-json">{
+    &quot;id&quot;: &quot;530633&quot;, 
+    &quot;name&quot;: &quot;Arcade&quot;
+}
+</code></pre>

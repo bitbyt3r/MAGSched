@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 import datetime
 import time
 
@@ -9,7 +9,7 @@ cache = {}
 
 @app.route("/")
 def root():
-    return "This is the MAGFest schedule cache service."
+    return render_template("index.html")
 
 def get_collection(collection):
     age = cache.get(collection+"-age")
@@ -74,7 +74,8 @@ def search(collection):
         if request.args.get("reverse", "false").lower() == "true":
             final.reverse()
         final = final[int(request.args.get("offset", 0)):]
-        final = final[:int(request.args.get("limit", 10))]
+        if request.args.get("limit", 10):
+            final = final[:int(request.args.get("limit", 10))]
         return jsonify(final)
     else:
         return f"Unknown datatype {collection}", 404
