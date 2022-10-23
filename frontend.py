@@ -44,10 +44,19 @@ def search(collection):
         prototype = filtered[0]
         for key in prototype.keys():
             if key in request.args:
-                print(f"Filtering on {key} == {request.args[key]}")
-                filtered = list(filter(lambda x: x[key] == request.args.get(key), filtered))
+                if isinstance(prototype[key], list):
+                    print(f"Filtering on {key} in {request.args[key]}")
+                    filtered = list(filter(lambda x: request.args.get(key) in x[key], filtered))
+                else:
+                    print(f"Filtering on {key} == {request.args[key]}")
+                    filtered = list(filter(lambda x: x[key] == request.args.get(key), filtered))
         final = list(filtered)
-        final.sort(key=lambda x: x.get(request.args.get("sort", "start_time")))
+        if collection == "sessions":
+            final.sort(key=lambda x: x.get(request.args.get("sort", "start_time")))
+        else:
+            final.sort(key=lambda x: x.get(request.args.get("sort", "name")))
+        if request.args.get("reverse", "false").lower() == "true":
+            final.reverse()
         final = final[int(request.args.get("offset", 0)):]
         final = final[:int(request.args.get("limit", 10))]
         return jsonify(final)
