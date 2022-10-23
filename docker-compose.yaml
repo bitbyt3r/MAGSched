@@ -1,0 +1,20 @@
+version: '3.8'
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379"
+
+  backend:
+    build: .
+    ports:
+      - 8080:8080
+    image: ghcr.io/bitbyt3r/magsched:latest
+    depends_on:
+      - redis
+    environment:
+      BACKENDS:  "[]"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
+      REFRESH_DELAY: "60"
