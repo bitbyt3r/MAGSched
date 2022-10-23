@@ -7,8 +7,8 @@ on:
     branches:
     - main
     paths:
-    - 'backend/**'
-    - '.github/workflows/ci-backend.yaml'
+    - '**'
+    - '.github/workflows/docker-build.yaml'
 
 jobs:
   build-backend:
