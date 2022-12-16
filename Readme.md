@@ -49,7 +49,7 @@ Finally, sheets requires credentials that have been authorized to access the use
 
 ## Panel Displays
 
-To access the panel displays go <a href="/displays">here</a> then select the appropriate location.
+To access the panel displays go <a href="/display">here</a> then select the appropriate location.
 
 ## API
 
