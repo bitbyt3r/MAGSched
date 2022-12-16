@@ -47,6 +47,10 @@ Additionally it requires a Google developer API key. See https://developers.goog
 
 Finally, sheets requires credentials that have been authorized to access the user's account. If you start the server locally with credentials set to an empty string it will launch a browser window interactively to allow you to authorize it to access sheets on your account. Once that is complete, it will save the session key to the database and continually refresh it. It will also print out the value needed for this variable so that you can copy it to a remote server. If this server gets any serious use I'll probably implement the flow server side, but it should be at most a once per year thing.
 
+## Panel Displays
+
+To access the panel displays go <a href="/displays">here</a> then select the appropriate location.
+
 ## API
 
 The REST API has the following endpoints:
