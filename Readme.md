@@ -58,7 +58,7 @@ Returns a list of sessions that are scheduled.
 | Argument         | Default    | Description                                                     |
 |------------------|------------|-----------------------------------------------------------------|
 | offset           | 0          | Pagination Offset                                               |
-| limit            | 10         | Pagination Result Limit (Set to 0 to get all results)           |
+| limit            | 10         | Pagination Result Limit (Set to -1 to get all results)          |
 | sort             | start_time | Set to the name of any key to sort results by that key          |
 | time_range_start |            | Allows you to filter results to a window of time. See below.    |
 | time_range_end   |            | Allows you to filter results to a window of time. See below.    |
