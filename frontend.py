@@ -82,8 +82,9 @@ def search(collection):
         if request.args.get("reverse", "false").lower() == "true":
             final.reverse()
         final = final[int(request.args.get("offset", 0)):]
-        if request.args.get("limit", 10):
-            final = final[:int(request.args.get("limit", 10))]
+        limit = int(request.args.get("limit", 10))
+        if limit > 0:
+            final = final[:limit]
         return jsonify(final)
     else:
         return f"Unknown datatype {collection}", 404
