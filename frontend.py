@@ -81,6 +81,11 @@ def search(collection):
                     print(f"Filtering on {key} in {request.args[key]}")
                     filtered = list(
                         filter(lambda x: request.args.get(key) in x[key], filtered))
+                if isinstance(prototype[key], bool):
+                    print(f"Filtering on {key} == True")
+                    filtered = list(
+                        filter(lambda x: x[key] == (request.args.get(key).lower() == "true"), filtered)
+                    )
                 else:
                     print(f"Filtering on {key} == {request.args[key]}")
                     filtered = list(
