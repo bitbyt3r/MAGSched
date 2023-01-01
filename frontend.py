@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, make_response
 import datetime
 import time
 
@@ -7,6 +7,16 @@ import database
 app = Flask(__name__)
 cache = {}
 
+def _build_cors_preflight_response():
+    response = make_response()
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    response.headers.add("Access-Control-Allow-Headers", "*")
+    response.headers.add("Access-Control-Allow-Methods", "*")
+    return response
+
+def _cors(response):
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    return response
 
 @app.route("/")
 def root():
@@ -30,8 +40,10 @@ def get_collection(collection):
     return cache.get(collection)
 
 
-@app.route("/<collection>")
+@app.route("/<collection>", methods=["GET", "OPTIONS"])
 def search(collection):
+    if request.method == "OPTIONS":
+        return _build_cors_preflight_response()
     results = get_collection(collection)
     if results is not None:
         if not results:
@@ -61,7 +73,7 @@ def search(collection):
                     filter(lambda x: x.end_time.timestamp() <= float(end_time), results))
         filtered = [x.serialize() for x in results]
         if not filtered:
-            return jsonify([])
+            return _cors(jsonify([]))
         prototype = filtered[0]
         for key in prototype.keys():
             if key in request.args:
@@ -85,18 +97,20 @@ def search(collection):
         limit = int(request.args.get("limit", 10))
         if limit > 0:
             final = final[:limit]
-        return jsonify(final)
+        return _cors(jsonify(final))
     else:
         return f"Unknown datatype {collection}", 404
 
 
-@app.route("/<collection>/<item>")
+@app.route("/<collection>/<item>", methods=["GET", "OPTIONS"])
 def retrieve(collection, item):
+    if request.method == "OPTIONS":
+        return _build_cors_preflight_response()
     results = get_collection(collection)
     if results:
         for result in results:
             if result.id == item:
-                return jsonify(result.serialize())
+                return _cors(jsonify(result.serialize()))
         return f"Could not find {item} in {collection}", 404
     else:
         return f"Unknown datatype {collection}", 404
