@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import List
 import datetime
 import config
 import redis
@@ -91,8 +92,8 @@ class Session(Collection):
         all_day: bool,
         name: str,
         description: str,
-        locations: list[str],
-        tracks: list[str]
+        locations: List[str],
+        tracks: List[str]
     ):
         self.id = id
         self.start_time = start_time

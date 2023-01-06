@@ -134,3 +134,18 @@ def display(display):
         if location.id == display:
             return render_template("display.html", location=location)
     return f"Unknown location {location}", 404
+
+
+@app.route("/upnext")
+def displaylist():
+    locations = get_collection("locations")
+    return render_template("upnextlist.html", locations=locations)
+
+
+@app.route("/upnext/<display>")
+def display(display):
+    locations = get_collection("locations")
+    for location in locations:
+        if location.id == display:
+            return render_template("upnext.html", location=location)
+    return f"Unknown location {location}", 404

@@ -51,6 +51,10 @@ Finally, sheets requires credentials that have been authorized to access the use
 
 To access the panel displays go <a href="/display">here</a> then select the appropriate location.
 
+## Up Next Displays
+
+To access the up next displays go <a href="/upnext">here</a> then select the appropriate location.
+
 ## API
 
 The REST API has the following endpoints:
