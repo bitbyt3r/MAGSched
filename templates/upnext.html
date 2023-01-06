@@ -233,12 +233,18 @@
             } else {
                 for (var i = 0; i < sessions.length; i++) {
                     let next = sessions[i];
-                    nameel.innerHTML = next.name;
-                    let date = moment(next.start_time);
-                    relativeel.innerHTML = date.fromNow();
-                    timeel.innerHTML = date.calendar();
-                    hideLogo();
-                    return;
+                    if (moment(next.start_time).isBefore()) {
+                        if (moment(next.end_time).isAfter()) {
+                            continue
+                        }
+                    } else {
+                        nameel.innerHTML = next.name;
+                        let date = moment(next.start_time);
+                        relativeel.innerHTML = date.fromNow();
+                        timeel.innerHTML = date.calendar();
+                        hideLogo();
+                        return;
+                    }
                 }
             }
             showLogo();
