@@ -137,13 +137,13 @@ def display(display):
 
 
 @app.route("/upnext")
-def displaylist():
+def upnextlist():
     locations = get_collection("locations")
     return render_template("upnextlist.html", locations=locations)
 
 
 @app.route("/upnext/<display>")
-def display(display):
+def upnext(display):
     locations = get_collection("locations")
     for location in locations:
         if location.id == display:
