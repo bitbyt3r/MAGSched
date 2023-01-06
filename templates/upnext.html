@@ -233,19 +233,12 @@
             } else {
                 for (var i = 0; i < sessions.length; i++) {
                     let next = sessions[i];
-                    if (moment(next.start_time).isBefore()) {
-                        if (moment(next.end_time).isAfter()) {
-                            showLogo();
-                            return
-                        }
-                    } else {
-                        nameel.innerHTML = next.name;
-                        let date = moment(next.start_time);
-                        relativeel.innerHTML = date.fromNow();
-                        timeel.innerHTML = date.calendar();
-                        hideLogo();
-                        return;
-                    }
+                    nameel.innerHTML = next.name;
+                    let date = moment(next.start_time);
+                    relativeel.innerHTML = date.fromNow();
+                    timeel.innerHTML = date.calendar();
+                    hideLogo();
+                    return;
                 }
             }
             showLogo();
