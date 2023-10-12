@@ -1,8 +1,10 @@
 from flask import Flask, jsonify, request, render_template, make_response
 import datetime
+import zoneinfo
 import time
 
 import database
+import config
 
 app = Flask(__name__)
 cache = {}
@@ -28,6 +30,21 @@ def get_collection(collection):
     if (not age) or (time.time() - age > 15):
         if collection == "sessions":
             results = list(database.Session.get())
+            if config.time_loop:
+                start = None
+                end = None
+                for result in results:
+                    if not start or result.start_time < start:
+                        start = result.start_time
+                    if not end or result.end_time > end:
+                        end = result.end_time
+                if start and end:
+                    event_duration = end - start
+                    time_since_start = datetime.datetime.utcnow().replace(tzinfo=zoneinfo.ZoneInfo('UTC')) - start
+                    time_offset = event_duration * (time_since_start // event_duration)
+                    for result in results:
+                        result.start_time += time_offset
+                        result.end_time += time_offset
         elif collection == "tracks":
             results = list(database.Track.get())
         elif collection == "locations":
@@ -133,7 +150,7 @@ def display(display):
     for location in locations:
         if location.id == display:
             return render_template("display.html", location=location)
-    return f"Unknown location {location}", 404
+    return f"Unknown location {display}", 404
 
 
 @app.route("/upnext")

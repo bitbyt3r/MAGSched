@@ -1,5 +1,6 @@
 import traceback
 import datetime
+import zoneinfo
 import requests
 import time
 import json
@@ -11,6 +12,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
 import database
+import config
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
@@ -26,7 +28,10 @@ class Sheets_Backend():
         if not self.sheet:
             raise ValueError("A Google Sheet ID is required")
         self.credentials = json.loads(config.get("credentials"))
-        creds = Credentials.from_authorized_user_info(json.loads(config.get('token')))
+        try:
+            creds = Credentials.from_authorized_user_info(json.loads(config.get('token')))
+        except:
+            creds = None
         self.headers = {
             "authorization": "Bearer "+self.key,
             "accept": "application/json"
@@ -75,13 +80,14 @@ class Sheets_Backend():
             yield obj
 
     def list_sessions(self):
+        timezone = zoneinfo.ZoneInfo(config.time_zone)
         for session in self.list_all("Sessions"):
             try:
                 yield database.Session(
                     str(session.get("id")),
                     #2017-09-18T22:13:25.766623+0000
-                    datetime.datetime.strptime(session.get("start_time"), "%m/%d/%Y %H:%M:%S"),
-                    datetime.datetime.strptime(session.get("end_time"), "%m/%d/%Y %H:%M:%S"),
+                    datetime.datetime.strptime(session.get('start_time'), "%m/%d/%Y %H:%M:%S").replace(tzinfo=timezone),
+                    datetime.datetime.strptime(session.get('end_time'), "%m/%d/%Y %H:%M:%S").replace(tzinfo=timezone),
                     session.get("all_day").lower() == "true",
                     session.get("name"),
                     session.get("description"),

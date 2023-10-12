@@ -103,6 +103,8 @@ class Session(Collection):
         self.description = description
         self.locations = locations
         self.tracks = tracks
+        assert self.start_time.tzinfo is not None and self.start_time.tzinfo.utcoffset(self.start_time) is not None
+        assert self.end_time.tzinfo is not None and self.end_time.tzinfo.utcoffset(self.end_time) is not None
 
     def serialize(self):
         return {
