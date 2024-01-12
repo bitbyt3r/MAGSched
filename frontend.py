@@ -287,4 +287,6 @@ def frab():
                 optout.string = "false"
 
 
-    return _cors(make_response(str(soup)))
+    response = _cors(make_response(str(soup)))
+    response.mimetype = "text/xml"
+    return response
