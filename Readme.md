@@ -136,3 +136,7 @@ Returns a single track by ID:
     "name": "Arcade"
 }
 ```
+
+### GET /frab
+
+Returns the complete schedule in XML/Frab format
