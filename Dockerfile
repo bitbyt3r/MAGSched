@@ -1,6 +1,6 @@
 FROM python:alpine
 
-RUN pip install --upgrade flask redis requests google-api-python-client google-auth-httplib2 google-auth-oauthlib gunicorn
+RUN pip install --upgrade flask redis requests google-api-python-client google-auth-httplib2 google-auth-oauthlib gunicorn bs4 lxml pytz
 
 ADD backends/ backends/
 ADD templates/ templates/
