@@ -240,7 +240,7 @@ def frab():
                 "type": "",
                 "language": "en",
                 "abstract": "",
-                "description": session.description,
+                "description": BeautifulSoup(session.description).get_text(),
                 "logo": "https://www.magfest.org/assets/logo_magfest_lg.png",
                 "persons": "",
                 "links": "",
