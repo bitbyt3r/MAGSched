@@ -208,7 +208,9 @@ def frab():
         locations = get_collection("locations")
         location_lookup = {x.id: x for x in locations}
         days = {}
-        for session in get_collection("sessions"):
+        sessions = get_collection("sessions")
+        sessions.sort(key=lambda x: x.start_time)
+        for session in sessions:
             day = session.start_time.astimezone(pytz.timezone(config.time_zone_name)).strftime("%Y-%m-%d")
             if not day in days:
                 days[day] = {
@@ -230,7 +232,7 @@ def frab():
                 duration = (session.end_time - session.start_time).seconds
                 days[day]["rooms"][location]["events"].append({
                     "id": session.id,
-                    "date": session.start_time.astimezone(pytz.timezone(config.time_zone_name)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat(),
+                    "date": session.start_time.astimezone(pytz.timezone(config.time_zone_name)).isoformat(),
                     "start": session.start_time.astimezone(pytz.timezone(config.time_zone_name)).strftime("%H:%M"),
                     "duration": f"{duration // 3600}:{int((duration % 3600)/60):02}",
                     "room": location_lookup[location].name,
@@ -248,7 +250,9 @@ def frab():
                     "links": "",
                     "attachments": ""
                 })
-        for idx, day in enumerate(days.values()):
+        day_list = list(days.values())
+        day_list.sort(key=lambda x: x['start'])
+        for idx, day in enumerate(day_list):
             day_tag = soup.new_tag("day", date=day['date'], end=day['end'], index=str(idx+1), start=day['start'])
             schedule.append(day_tag)
             for room in day['rooms'].values():
