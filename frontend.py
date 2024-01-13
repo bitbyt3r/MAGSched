@@ -242,7 +242,7 @@ def frab():
                     "subtitle": "",
                     "track": session.tracks[0] if session.tracks else "",
                     "type": "",
-                    "language": "en",
+                    "language": "",
                     "abstract": "",
                     "description": BeautifulSoup(session.description).get_text(),
                     "logo": "https://www.magfest.org/assets/logo_magfest_lg.png",
