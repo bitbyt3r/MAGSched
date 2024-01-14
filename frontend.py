@@ -27,7 +27,6 @@ def _cors(response):
 def root():
     return render_template("index.html")
 
-
 def get_collection(collection):
     age = cache.get(collection+"-age")
     if (not age) or (time.time() - age > 15):
@@ -59,26 +58,20 @@ def get_collection(collection):
         return results
     return cache.get(collection)
 
-
-@app.route("/<collection>", methods=["GET", "OPTIONS"])
 def search(collection):
-    if request.method == "OPTIONS":
-        return _build_cors_preflight_response()
     results = get_collection(collection)
     if results is not None:
         if not results:
-            return jsonify([])
+            return []
         if collection == "sessions":
             start_time = request.args.get("time_range_start")
             if start_time:
-                print(start_time)
                 if start_time == "now":
                     start_time = time.time()
                 elif start_time.startswith("+"):
                     start_time = time.time() + float(start_time.split("+")[1])
                 elif start_time.startswith("-"):
                     start_time = time.time() - float(start_time.split("-")[1])
-                print(start_time)
                 results = list(
                     filter(lambda x: x.start_time.timestamp() >= float(start_time), results))
             end_time = request.args.get("time_range_end")
@@ -114,6 +107,9 @@ def search(collection):
         if collection == "sessions":
             final.sort(key=lambda x: x.get(
                 request.args.get("sort", "start_time")))
+            for session in final:
+                if "description" in session:
+                    session['description'] = BeautifulSoup(session['description']).get_text()
         else:
             final.sort(key=lambda x: x.get(request.args.get("sort", "name")))
         if request.args.get("reverse", "false").lower() == "true":
@@ -122,7 +118,34 @@ def search(collection):
         limit = int(request.args.get("limit", 10))
         if limit > 0:
             final = final[:limit]
-        return _cors(jsonify(final))
+        return final
+    return []
+
+@app.route("/bops-graphics", methods=["GET", "OPTIONS"])
+def bops_graphics():
+    if request.method == "OPTIONS":
+        return _build_cors_preflight_response()
+    sessions = search("sessions")
+    locations = get_collection("locations")
+    location_lookup = {x.id: x for x in locations}
+    formatted = []
+    for session in sessions:
+        formatted.append({
+            "start_time": datetime.datetime.fromisoformat(session['start_time']).astimezone(pytz.timezone(config.time_zone_name)).strftime("%-I:%M %p"),
+            "end_time": datetime.datetime.fromisoformat(session['end_time']).astimezone(pytz.timezone(config.time_zone_name)).strftime("%-I:%M %p"),
+            "id": session['id'],
+            "location": location_lookup[session['locations'][0]].name,
+            "name": session['name'],
+        })
+    return _cors(jsonify(formatted))
+
+@app.route("/<collection>", methods=["GET", "OPTIONS"])
+def search_collection(collection):
+    if request.method == "OPTIONS":
+        return _build_cors_preflight_response()
+    results = search(collection)
+    if results:
+        return _cors(jsonify(results))
     else:
         return f"Unknown datatype {collection}", 404
 
