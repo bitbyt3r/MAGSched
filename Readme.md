@@ -89,6 +89,53 @@ Each end of the range can be:
 
 To get the next hour of events use `time_range_start=now&time_range_end=+3600` for example. To get events starting one hour ago until the end of the schedule use `time_range_start=-3600`.
 
+### GET /bops-graphics
+
+Returns a list of sessions that are schedule, but in a broadcast-friendly format.
+
+Accepts all the same arguments as `/sessions` above.
+
+Returns a simplified object:
+```json
+[
+  {
+    "end_time": "11:59 PM",
+    "id": "29587736",
+    "location": "Accessibility Services (Expo Hall E Reg Desk)",
+    "name": "Accessibility Desk open",
+    "start_time": "10:00 AM"
+  },
+  {
+    "end_time": "11:00 AM",
+    "id": "29587743",
+    "location": "Zombie Tag (Magnolia 3)",
+    "name": "Zombie Tag Sign up, Events, and Makeup",
+    "start_time": "10:00 AM"
+  },
+  {
+    "end_time": "10:00 PM",
+    "id": "29587969",
+    "location": "MAG Attendee Services/Info Desk (Potomac Coat Check)",
+    "name": "Info Desk Open",
+    "start_time": "10:00 AM"
+  },
+  {
+    "end_time": "11:00 AM",
+    "id": "29587741",
+    "location": "Tabletop Panels/Discussions (Riverview Ballroom 1)",
+    "name": "Donut Steel: the Original Character Panel",
+    "start_time": "10:00 AM"
+  },
+  {
+    "end_time": "12:00 PM",
+    "id": "29769137",
+    "location": "magFAST (Chesapeake 4,5,6)",
+    "name": "magFAST Preshow and Swadge Showcase",
+    "start_time": "11:00 AM"
+  }
+]
+```
+
 ### GET /sessions/<id>
 
 Returns a single session object by ID:
