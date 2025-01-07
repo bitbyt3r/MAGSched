@@ -331,5 +331,5 @@ def frab():
 def frab_filtered():
     if request.method == "OPTIONS":
         return _build_cors_preflight_response()
-    results = search("sessions")
+    results = [database.Session.deserialize(x) for x in search("sessions")]
     return _cors(make_response(str(sessions_to_frab(results))))
