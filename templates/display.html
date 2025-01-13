@@ -218,12 +218,8 @@
 
         async function load() {
             let res = await fetch("/sessions?locations={{location.id}}&limit=-1");
-            sessions = await res.json().then(refresh);
-            // sessions = [{
-            //     start_time: "2022-12-16T07:30:00",
-            //     end_time: "2022-12-16T07:35:00",
-            //     name: "Test panel"
-            // }]
+            sessions = await res.json();
+            refresh();
         }
 
         function refresh() {
