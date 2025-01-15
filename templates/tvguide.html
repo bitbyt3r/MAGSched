@@ -91,20 +91,10 @@
         }
 
         #slider {
-            animation: MoveUpDown 100s linear infinite;
             position: relative;
             display: flex;
             left: 0;
             bottom: 0;
-        }
-
-        @keyframes MoveUpDown {
-            0%, 100% {
-                transform: translateY(5%);
-            }
-            50% {
-                transform: translateY(-95%);
-            }
         }
 
         .scanlines {
@@ -263,6 +253,29 @@
                 timeline.append(div);
             }
         }
+
+        const keyframes = [
+            { transform: "translateY(0)" },
+            { transform: "translateY(-50px)" },
+        ];
+
+        const settings = {
+            duration: 1000,
+            iterations: 1,
+        };
+        let animation = slider.animate(keyframes, settings);
+
+        function update_schedule(event) {
+            let firstrow = schedule.children[0];
+            schedule.removeChild(firstrow);
+            schedule.append(firstrow);
+
+            let firstlocation = locations_el.children[0];
+            locations_el.removeChild(firstlocation);
+            locations_el.append(firstlocation);
+            animation.play();
+        }
+        animation.addEventListener("finish", update_schedule);
         load();
         setInterval(load, 60000);
     </script>
