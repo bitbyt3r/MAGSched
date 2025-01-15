@@ -219,7 +219,7 @@
         async function load() {
             let res = await fetch("/sessions?locations={{location.id}}&limit=-1");
             sessions = await res.json();
-            refresh();
+            //refresh();
         }
 
         function refresh() {

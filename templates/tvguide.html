@@ -1,0 +1,225 @@
+<html>
+
+<head>
+    <style>
+        body {
+            background-color: rgba(0, 0, 0, 0);
+            height: 100%;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: clip;
+        }
+
+        .toprow {
+            align-items: center;
+            background-color: blue;
+            display: flex;
+            flex-direction: row;
+        }
+
+        .stream {
+        }
+
+        .advertisement {
+            width: 500px;
+            text-align: center;
+            color: yellow;
+            font-size: 25px;
+            flex-grow: 1;
+        }
+
+        #timeline {
+            background-color: darkblue;
+            overflow: clip;
+            height: 50px;
+            flex-shrink: 0;
+        }
+
+        .time {
+            position: absolute;
+            flex-shrink: 0;
+            height: 50px;
+            color: white;
+        }
+
+        .scheduletable {
+            background-color: blue;
+            overflow: clip;
+            flex-grow: 1;
+            flex-direction: row;
+            display: flex;
+        }
+
+        #locations {
+            width: 200px;
+            flex-direction: column;
+            display: flex;
+            flex-shrink: 0;
+            z-index: 50;
+            animation: MoveUpDown 100s linear infinite;
+        }
+
+        #schedule {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            background-color: aqua;
+        }
+
+        .schedulerow {
+            height: 50px;
+            flex-direction: row;
+            display: flex;
+            flex-shrink: 0;
+            background-color: blueviolet;
+        }
+
+        .locationname {
+            height: 46px;
+            flex-shrink: 0;
+            background-color: chocolate;
+            border: 2px solid black;
+        }
+
+        .session {
+            flex-shrink: 0;
+            position: absolute;
+            height: 46px;
+            background-color: cornflowerblue;
+            border: 2px solid black;
+        }
+
+        #slider {
+            animation: MoveUpDown 100s linear infinite;
+            position: relative;
+            display: flex;
+            left: 0;
+            bottom: 0;
+        }
+
+        @keyframes MoveUpDown {
+            0%, 100% {
+                transform: translateY(5%);
+            }
+            50% {
+                transform: translateY(-95%);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="toprow">
+        <div class="stream">
+            <video id='video' controls='controls' preload='none' poster="https://assets.codepen.io/32795/poster.png">
+                <source id='mp4' src="http://media.w3.org/2010/05/sintel/trailer.mp4" type='video/mp4' />
+                <source id='webm' src="http://media.w3.org/2010/05/sintel/trailer.webm" type='video/webm' />
+                <source id='ogv' src="http://media.w3.org/2010/05/sintel/trailer.ogv" type='video/ogg' />
+            </video>
+        </div>
+        <div class="advertisement">
+            <h2>Is your festival too small?</h2>
+            <h1>CALL NOW!</h1>
+            <h2>Three easy payments!</h2>
+        </div>
+    </div>
+    <div id="timeline"></div>
+    <div class="scheduletable">
+        <div id="locations"></div>
+        <div id="slider">
+            <div id="schedule"></div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        let schedule = document.getElementById("schedule");
+        let locations_el = document.getElementById("locations");
+        let timeline = document.getElementById("timeline");
+        let slider = document.getElementById("slider");
+        var locations = [];
+        var locations_lookup = {};
+        var visible_locations = [];
+        var sessions = [];
+        var sessions_by_location = {};
+        var start_time = Infinity;
+        var end_time = 0;
+        let hour_width = 200;
+
+        async function load() {
+            locations_lookup = {};
+            locations = await fetch("/locations?limit=-1").then(res => res.json());
+            locations.forEach((location) => {
+                locations_lookup[location.id] = location;
+            })
+            sessions = await fetch("/sessions?limit=-1").then(res => res.json());
+            sessions_by_location = {};
+            visible_locations = [];
+            sessions.forEach((session) => {
+                let session_start_time = new Date(session.start_time).getTime() / 1000;
+                let session_end_time = new Date(session.end_time).getTime() / 1000;
+                if (session_start_time < start_time) {
+                    start_time = session_start_time;
+                }
+                if (session_end_time > end_time) {
+                    end_time = session_end_time;
+                }
+                session.width = (session_end_time - session_start_time) / 3600 * hour_width;
+
+                let location = session.locations[0];
+                if (visible_locations.indexOf(location) === -1) {
+                    visible_locations.push(location);
+                    sessions_by_location[location] = [];
+                }
+                sessions_by_location[location].push(session);
+            })
+
+            let now = new Date().getTime() / 1000;
+            locations_el.replaceChildren();
+            schedule.replaceChildren();
+            timeline.replaceChildren();
+
+            for (const [location, sessions_in_location] of Object.entries(sessions_by_location)) {
+                let div = document.createElement("div");
+                div.classList.add("schedulerow");
+                let location_div = document.createElement("div");
+                location_div.classList.add("locationname");
+                location_div.innerText = locations_lookup[location].name;
+                locations_el.append(location_div);
+                sessions_in_location.forEach((session) => {
+                    let session_start_time = new Date(session.start_time).getTime() / 1000;
+                    session.position = (now - session_start_time) / 3600 * hour_width;
+                    if (session.position < 0) {
+                        session.width = session.width + session.position;
+                        session.position = 0;
+                    }
+                    if (session.width > 50) {
+                        let session_div = document.createElement("div");
+                        session_div.classList.add("session");
+                        let session_time = new Date(session.start_time).toLocaleTimeString();
+                        session_div.innerText = session.name.slice(0, 32);
+                        session_div.style.left = Math.round(session.position) + 'px';
+                        session_div.style.width = Math.round(session.width) + 'px';
+                        div.append(session_div);
+                    }
+                })
+                schedule.append(div);
+            }
+            
+            for (let time=start_time; time <= end_time; time += 3600) {
+
+                let div = document.createElement("div");
+                div.classList.add("time");
+                let date = new Date(time * 1000);
+                div.innerText = date.toLocaleTimeString();
+                div.style.width = hour_width + "px";
+                div.style.left = ((now - time) / 3600) * hour_width + 200 + "px";
+                timeline.append(div);
+            }
+        }
+        load();
+        setInterval(load, 60000);
+    </script>
+</body>
+
+</html>

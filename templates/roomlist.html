@@ -1,0 +1,4 @@
+<h1>Choose a location:</h1>
+{% for i in locations | sort(attribute='name') %}
+<a href="/room/{{i.id}}">{{i.name}}</a><br>
+{% endfor %}

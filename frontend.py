@@ -11,6 +11,8 @@ import database
 import config
 
 app = Flask(__name__)
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.debug = True
 cache = {}
 
 def _build_cors_preflight_response():
@@ -145,7 +147,7 @@ def search_collection(collection):
     if request.method == "OPTIONS":
         return _build_cors_preflight_response()
     results = search(collection)
-    if results:
+    if results is not None:
         return _cors(jsonify(results))
     else:
         return f"Unknown datatype {collection}", 404
@@ -156,7 +158,7 @@ def retrieve(collection, item):
     if request.method == "OPTIONS":
         return _build_cors_preflight_response()
     results = get_collection(collection)
-    if results:
+    if results is not None:
         for result in results:
             if result.id == item:
                 return _cors(jsonify(result.serialize()))
@@ -192,6 +194,23 @@ def upnext(display):
     for location in locations:
         if location.id == display:
             return render_template("upnext.html", location=location)
+    return f"Unknown location {location}", 404
+
+@app.route("/room")
+def roomlist():
+    locations = get_collection("locations")
+    return render_template("roomlist.html", locations=locations)
+
+@app.route("/tvguide")
+def tvguide():
+    return render_template("tvguide.html", locations=[])
+
+@app.route("/room/<display>")
+def room(display):
+    locations = get_collection("locations")
+    for location in locations:
+        if location.id == display:
+            return render_template("room.html", location=location)
     return f"Unknown location {location}", 404
 
 def make_guid(collection, id):
