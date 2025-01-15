@@ -234,7 +234,7 @@
                 locations_el.append(location_div);
                 sessions_in_location.forEach((session) => {
                     let session_start_time = new Date(session.start_time).getTime() / 1000;
-                    session.position = (now - session_start_time) / 3600 * hour_width;
+                    session.position = (session_start_time - now) / 3600 * hour_width;
                     if (session.position < 0) {
                         session.width = session.width + session.position;
                         session.position = 0;
@@ -259,7 +259,7 @@
                 let date = new Date(time * 1000);
                 div.innerText = date.toLocaleTimeString();
                 div.style.width = hour_width + "px";
-                div.style.left = ((now - time) / 3600) * hour_width + 200 + "px";
+                div.style.left = ((time - now) / 3600) * hour_width + 200 + "px";
                 timeline.append(div);
             }
         }
