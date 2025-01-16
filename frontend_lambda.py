@@ -24,6 +24,7 @@ def render_template(path, **kwargs):
     return template.render(**kwargs)
 
 def lambda_handler(event, context):
+    print(event, context)
     request.args = event['queryStringParameters']
     request.path = event['rawPath']
     request.method = event['requestContext']['http']['method']
