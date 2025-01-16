@@ -358,6 +358,7 @@ def frab():
     age = cache.get("frab-age")
     if (not age) or (time.time() - age > 60):
         sessions = get_collection("sessions")
+        print(sessions)
         sessions.sort(key=lambda x: x.start_time)
         soup = sessions_to_frab(sessions)
         full_frab = str(soup)
