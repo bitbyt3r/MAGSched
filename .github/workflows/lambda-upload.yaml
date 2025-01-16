@@ -39,6 +39,7 @@ jobs:
           mkdir package
           pip install --target package bs4 lxml pytz
           mv frontend_lambda.py package/
+          cp -r templates package/
           cd package
           zip -r ../lambda.zip .
       - name: Deploy lambda
