@@ -181,6 +181,33 @@
         var start_time = Infinity;
         var end_time = 0;
         let hour_width = 200;
+        var animation_started = false;
+
+        const keyframes = [
+            { transform: "translateY(0)" },
+            { transform: "translateY(-50px)" },
+        ];
+
+        const settings = {
+            duration: 1000,
+            iterations: 1,
+        };
+
+        function start_animation() {
+            let animation = slider.animate(keyframes, settings);
+
+            function update_schedule(event) {
+                let firstrow = schedule.children[0];
+                schedule.removeChild(firstrow);
+                schedule.append(firstrow);
+
+                let firstlocation = locations_el.children[0];
+                locations_el.removeChild(firstlocation);
+                locations_el.append(firstlocation);
+                animation.play();
+            }
+            animation.addEventListener("finish", update_schedule);
+        }
 
         async function load() {
             locations_lookup = {};
@@ -252,30 +279,12 @@
                 div.style.left = ((time - now) / 3600) * hour_width + 200 + "px";
                 timeline.append(div);
             }
+            
+            if (!animation_started) {
+                animation_started = true;
+                start_animation();
+            }
         }
-
-        const keyframes = [
-            { transform: "translateY(0)" },
-            { transform: "translateY(-50px)" },
-        ];
-
-        const settings = {
-            duration: 1000,
-            iterations: 1,
-        };
-        let animation = slider.animate(keyframes, settings);
-
-        function update_schedule(event) {
-            let firstrow = schedule.children[0];
-            schedule.removeChild(firstrow);
-            schedule.append(firstrow);
-
-            let firstlocation = locations_el.children[0];
-            locations_el.removeChild(firstlocation);
-            locations_el.append(firstlocation);
-            animation.play();
-        }
-        animation.addEventListener("finish", update_schedule);
         load();
         setInterval(load, 60000);
     </script>
