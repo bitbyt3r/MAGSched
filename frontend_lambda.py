@@ -33,7 +33,6 @@ def lambda_handler(event, context):
     request.args = event.get('queryStringParameters', {})
     request.path = event.get('rawPath', event.get('path'))
     request.method = event.get('requestContext', {}).get('http', {}).get('method', 'GET')
-    request.method = event['requestContext']['http']['method']
     body = ""
     status = 200
     headers = {
