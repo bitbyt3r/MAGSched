@@ -6,7 +6,6 @@ import json
 
 class Collection(ABC):
     
-    @abstractmethod
     def deserialize(cls, string: str):
         return cls.extract(json.loads(string))
 
