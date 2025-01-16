@@ -51,6 +51,6 @@ jobs:
           function_name: magsched_guidebook_frontend
           zip_file: lambda.zip
           memory_size: 128
-          timeout: 5
+          timeout: 20
           handler: frontend_lambda.lambda_handler
           runtime: python3.13

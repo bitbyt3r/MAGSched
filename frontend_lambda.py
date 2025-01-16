@@ -25,6 +25,9 @@ def render_template(path, **kwargs):
     template = env.get_template(path)
     return template.render(**kwargs)
 
+def jsonify(data):
+    return json.dumps()
+
 def lambda_handler(event, context):
     print(event, context)
     request.args = event.get('queryStringParameters', {})
@@ -45,7 +48,33 @@ def lambda_handler(event, context):
     elif request.path == "/frab/filtered":
         body = frab_filtered()
         headers["Content-Type"] = "text/xml"
-    else:
+    elif request.path == "/bops-graphics":
+        body = bops_graphics()
+    elif request.path in ["/sessions", "/locations", "/tracks"]:
+        body = search_collection(request.path[1:])
+    elif request.path.split("/")[1] in ["sessions", "locations", "tracks"] and len(request.path.split("/")) == 3:
+        _, collection, item = request.path.split("/")
+        body = retrieve(collection, item)
+    elif request.path == "/display":
+        body = displaylist()
+        headers["Content-Type"] = "text/html"
+    elif request.path.startswith("/display/"):
+        body = display(request.path.split("/display/")[1])
+    elif request.path == "/upnext":
+        body = upnextlist()
+        headers["Content-Type"] = "text/html"
+    elif request.path.startswith("/upnext/"):
+        body = upnext(request.path.split("/upnext/")[1])
+    elif request.path == "/room":
+        body = roomlist()
+        headers["Content-Type"] = "text/html"
+    elif request.path.startswith("/room/"):
+        body = room(request.path.split("/room/")[1])
+    elif request.path == "/tvguide":
+        body = tvguide()
+        headers["Content-Type"] = "text/html"
+    
+    if not body:
         status = 404
         body = "Not Found. See <a href='/'>the docs</a>"
         headers['Content-Type'] = "text/html"
@@ -151,10 +180,7 @@ def search(collection):
         return final
     return []
 
-#@app.route("/bops-graphics", methods=["GET", "OPTIONS"])
 def bops_graphics():
-    if request.method == "OPTIONS":
-        return _build_cors_preflight_response()
     sessions = search("sessions")
     locations = get_collection("locations")
     location_lookup = {x.id: x for x in locations}
@@ -167,78 +193,51 @@ def bops_graphics():
             "location": location_lookup[session['locations'][0]].name,
             "name": session['name'],
         })
-    return _cors(jsonify(formatted))
+    return jsonify(formatted)
 
-#@app.route("/<collection>", methods=["GET", "OPTIONS"])
 def search_collection(collection):
-    if request.method == "OPTIONS":
-        return _build_cors_preflight_response()
     results = search(collection)
-    if results is not None:
-        return _cors(jsonify(results))
-    else:
-        return f"Unknown datatype {collection}", 404
+    return jsonify(results)
 
-
-#@app.route("/<collection>/<item>", methods=["GET", "OPTIONS"])
 def retrieve(collection, item):
-    if request.method == "OPTIONS":
-        return _build_cors_preflight_response()
     results = get_collection(collection)
     if results is not None:
         for result in results:
             if result.id == item:
-                return _cors(jsonify(result.serialize()))
-        return f"Could not find {item} in {collection}", 404
-    else:
-        return f"Unknown datatype {collection}", 404
+                return jsonify(result.serialize())
 
-
-#@app.route("/display")
 def displaylist():
     locations = get_collection("locations")
     return render_template("displaylist.html", locations=locations)
 
-
-#@app.route("/display/<display>")
 def display(display):
     locations = get_collection("locations")
     for location in locations:
         if location.id == display:
             return render_template("display.html", location=location)
-    return f"Unknown location {display}", 404
 
-
-#@app.route("/upnext")
 def upnextlist():
     locations = get_collection("locations")
     return render_template("upnextlist.html", locations=locations)
 
-
-#@app.route("/upnext/<display>")
 def upnext(display):
     locations = get_collection("locations")
     for location in locations:
         if location.id == display:
             return render_template("upnext.html", location=location)
-    return f"Unknown location {location}", 404
 
-#@app.route("/room")
 def roomlist():
     locations = get_collection("locations")
     return render_template("roomlist.html", locations=locations)
 
-#@app.route("/tvguide")
-def tvguide():
-    return render_template("tvguide.html", locations=[])
-
-#@app.route("/room/<display>")
 def room(display):
     locations = get_collection("locations")
     for location in locations:
         if location.id == display:
             return render_template("room.html", location=location)
-    return f"Unknown location {location}", 404
+
+def tvguide():
+    return render_template("tvguide.html", locations=[])
 
 def make_guid(collection, id):
     url = f"{config.base_url}/{collection}/{id}"
@@ -355,7 +354,6 @@ def sessions_to_frab(sessions):
                 optout.string = "false"
     return soup
 
-#@app.route("/frab", methods=["GET", "OPTIONS"])
 def frab():
     age = cache.get("frab-age")
     if (not age) or (time.time() - age > 60):
@@ -367,10 +365,8 @@ def frab():
         cache["frab-age"] = time.time()
     else:
         full_frab = cache.get("frab")
-
     return full_frab
 
-#@app.route("/frab/filtered", methods=["GET", "OPTIONS"])
 def frab_filtered():
     results = [database.Session.extract(x) for x in search("sessions")]
     return str(sessions_to_frab(results))
