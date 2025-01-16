@@ -2,10 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List
 import datetime
 import config
-import redis
 import json
-
-db = redis.Redis(host=config.redis_host, port=config.redis_port, db=config.redis_db, decode_responses=True)
 
 class Collection(ABC):
     @abstractmethod
