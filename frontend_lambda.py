@@ -60,16 +60,19 @@ def lambda_handler(event, context):
         headers["Content-Type"] = "text/html"
     elif request.path.startswith("/display/"):
         body = display(request.path.split("/display/")[1])
+        headers["Content-Type"] = "text/html"
     elif request.path == "/upnext":
         body = upnextlist()
         headers["Content-Type"] = "text/html"
     elif request.path.startswith("/upnext/"):
         body = upnext(request.path.split("/upnext/")[1])
+        headers["Content-Type"] = "text/html"
     elif request.path == "/room":
         body = roomlist()
         headers["Content-Type"] = "text/html"
     elif request.path.startswith("/room/"):
         body = room(request.path.split("/room/")[1])
+        headers["Content-Type"] = "text/html"
     elif request.path == "/tvguide":
         body = tvguide()
         headers["Content-Type"] = "text/html"
