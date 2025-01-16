@@ -31,7 +31,7 @@ def jsonify(data):
 def lambda_handler(event, context):
     print(event, context)
     request.args = event.get('queryStringParameters', {})
-    request.path = event['rawPath']
+    request.path = event.get('rawPath', event.get('path'))
     request.method = event['requestContext']['http']['method']
     body = ""
     status = 200
