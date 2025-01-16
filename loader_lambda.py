@@ -224,7 +224,7 @@ def lambda_handler(event, context):
             "locations": [x.serialize() for x in Location.get()],
             "tracks": [x.serialize() for x in Track.get()]
         })
-        client.put_object(response.encode('UTF-8'), Bucket="magsched-cache", Key="cache.json")
+        client.put_object(Body=response.encode('UTF-8'), Bucket="magsched-cache", Key="cache.json")
     return {
         'statusCode': 200,
         'body': response
