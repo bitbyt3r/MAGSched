@@ -247,7 +247,7 @@ def make_guid(collection, id):
 def sessions_to_frab(sessions):
     locations = get_collection("locations")
     location_lookup = {x.id: x for x in locations}
-    soup = BeautifulSoup(features='xml')
+    soup = BeautifulSoup()
     schedule = soup.new_tag("schedule")
     soup.append(schedule)
     generator = soup.new_tag("generator", attrs={"name": "magsched", "version": "1.0"})
