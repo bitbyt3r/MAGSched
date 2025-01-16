@@ -5,8 +5,10 @@ import config
 import json
 
 class Collection(ABC):
+    
     @abstractmethod
-    def deserialize(cls, string: str): pass
+    def deserialize(cls, string: str):
+        return cls.extract(json.loads(string))
 
     @abstractmethod
     def serialize(self) -> str: pass
@@ -30,8 +32,7 @@ class Collection(ABC):
 
 class Track(Collection):
     @classmethod
-    def deserialize(cls, string: str):
-        data = json.loads(string)
+    def extract(cls, data: dict):
         return cls(
             data.get("id"),
             data.get("name")
@@ -49,8 +50,7 @@ class Track(Collection):
 
 class Location(Collection):
     @classmethod
-    def deserialize(cls, string: str):
-        data = json.loads(string)
+    def extract(cls, data: dict):
         return cls(
             data.get("id"),
             data.get("name")
@@ -68,8 +68,7 @@ class Location(Collection):
 
 class Session(Collection):
     @classmethod
-    def deserialize(cls, string: str):
-        data = json.loads(string)
+    def extract(cls, data: dict):
         return cls(
             data.get("id"),
             datetime.datetime.fromisoformat(data.get("start_time")),
