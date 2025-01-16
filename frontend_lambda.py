@@ -11,7 +11,7 @@ import pytz
 import database
 import config
 
-env = jinja2.Environment()
+env = jinja2.Environment(loader=jinja2.FileSystemLoader("templates"))
 client = boto3.client('s3')
 cache = {}
 
@@ -25,7 +25,7 @@ def render_template(path, **kwargs):
 
 def lambda_handler(event, context):
     print(event, context)
-    request.args = event['queryStringParameters']
+    request.args = event.get('queryStringParameters', {})
     request.path = event['rawPath']
     request.method = event['requestContext']['http']['method']
     body = ""
