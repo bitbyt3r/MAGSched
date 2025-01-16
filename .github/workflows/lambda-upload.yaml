@@ -1,0 +1,55 @@
+name: deploy to lambda
+on: [push]
+jobs:
+  deploy_loader:
+    environment: Deploy
+    name: deploy loader lambda function
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout source code
+        uses: actions/checkout@v3
+      - name: Build venv
+        run: |
+          mkdir package
+          mv loader_lambda.py package/
+          cd package
+          zip -r ../lambda.zip .
+      - name: Deploy lambda
+        uses: appleboy/lambda-action@v0.2.0
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_region: ${{ secrets.AWS_REGION }}
+          function_name: magsched_guidebook_loader
+          zip_file: lambda.zip
+          memory_size: 128
+          timeout: 15
+          handler: loader_lambda.lambda_handler
+          runtime: python3.13
+
+  deploy_frontend:
+    environment: Deploy
+    name: deploy frontend lambda function
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout source code
+        uses: actions/checkout@v3
+      - name: Build venv
+        run: |
+          mkdir package
+          pip install --target package bs4 lxml pytz
+          mv frontend_lambda.py package/
+          cd package
+          zip -r ../lambda.zip .
+      - name: Deploy lambda
+        uses: appleboy/lambda-action@v0.2.0
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_region: ${{ secrets.AWS_REGION }}
+          function_name: magsched_guidebook_frontend
+          zip_file: lambda.zip
+          memory_size: 128
+          timeout: 5
+          handler: frontend_lambda.lambda_handler
+          runtime: python3.13
