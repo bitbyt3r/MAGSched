@@ -64,7 +64,7 @@ def get_collection(collection):
         now = time.time()
         data = client.get_object(Bucket="magsched-cache", Key="cache.json")['Body'].read()
         resources = json.loads(data)
-        cache['sessions'] = [database.Session.deserialize(x) for x in resources['sessions']]
+        cache['sessions'] = [database.Session.extract(x) for x in resources['sessions']]
         if config.time_loop:
             start = None
             end = None
@@ -80,8 +80,8 @@ def get_collection(collection):
                 for session in cache['sessions']:
                     session.start_time += time_offset
                     session.end_time += time_offset
-        cache['tracks'] = [database.Track.deserialize(x) for x in resources['tracks']]
-        cache['locations'] = [database.Location.deserialize(x) for x in resources['locations']]
+        cache['tracks'] = [database.Track.extract(x) for x in resources['tracks']]
+        cache['locations'] = [database.Location.extract(x) for x in resources['locations']]
         for collection in ["sessions", "tracks", "locations"]:
             cache[collection+"-age"] = now
     return cache.get(collection)
@@ -370,5 +370,5 @@ def frab():
 
 #@app.route("/frab/filtered", methods=["GET", "OPTIONS"])
 def frab_filtered():
-    results = [database.Session.deserialize(json.dumps(x)) for x in search("sessions")]
+    results = [database.Session.extract(x) for x in search("sessions")]
     return str(sessions_to_frab(results))
