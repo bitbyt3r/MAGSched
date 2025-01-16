@@ -26,7 +26,7 @@ def render_template(path, **kwargs):
     return template.render(**kwargs)
 
 def jsonify(data):
-    return json.dumps()
+    return json.dumps(data)
 
 def lambda_handler(event, context):
     print(event, context)
