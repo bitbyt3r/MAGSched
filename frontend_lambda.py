@@ -82,8 +82,8 @@ def get_collection(collection):
                     session.end_time += time_offset
         cache['tracks'] = [database.Track.extract(x) for x in resources['tracks']]
         cache['locations'] = [database.Location.extract(x) for x in resources['locations']]
-        for collection in ["sessions", "tracks", "locations"]:
-            cache[collection+"-age"] = now
+        for collectionname in ["sessions", "tracks", "locations"]:
+            cache[collectionname+"-age"] = now
     return cache.get(collection)
 
 def search(collection):
