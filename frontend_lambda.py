@@ -2,7 +2,7 @@ import boto3
 import time
 import json
 
-client = boto3.resource('s3')
+client = boto3.client('s3')
 resources = {}
 resources_timestamp = 0
 
