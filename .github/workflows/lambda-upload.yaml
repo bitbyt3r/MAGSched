@@ -38,7 +38,7 @@ jobs:
         run: |
           mkdir package
           pip install --target package bs4 lxml pytz jinja2
-          mv frontend_lambda.py package/
+          mv frontend_lambda.py database.py config.py package/
           cp -r templates package/
           cd package
           zip -r ../lambda.zip .
