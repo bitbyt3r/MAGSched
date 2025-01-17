@@ -233,7 +233,7 @@
             locations.forEach((location) => {
                 locations_lookup[location.id] = location;
             })
-            sessions = await fetch("/sessions?limit=-1").then(res => res.json());
+            sessions = await fetch("/sessions?limit=-1&time_range_start=-1800&time_range_end=%2B28800").then(res => res.json());
             sessions_by_location = {};
             visible_locations = [];
             sessions.forEach((session) => {
@@ -296,17 +296,18 @@
                 let div = document.createElement("div");
                 div.classList.add("time");
                 let date = new Date(time * 1000);
+                date.setMinutes(0);
                 div.innerText = date.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
                 div.style.width = hour_width + "px";
-                div.style.left = Math.round((time - now) / 900) / 4 * hour_width + 200 + "px";
-                offset = (Math.round((time - now) / 900) / 4 * hour_width + 200) % 200;
-                if (Math.round((time - now) / 900) / 4 * hour_width + 200 > 200) {
+                div.style.left = Math.round((time - now) / 900) / 4 * hour_width + hour_width + "px";
+                offset = (Math.round((time - now) / 900) / 4 * hour_width) % hour_width;
+                if (Math.round((time - now) / 900) / 4 * hour_width + hour_width > hour_width) {
                     timeline.append(div);
                 }
             }
 
             console.log(offset);
-            schedule.style.backgroundPositionX = 3 - offset + "px";
+            schedule.style.backgroundPositionX = offset - hour_width + 2 + "px";
             console.log(schedule.style.backgroundPositionX);
 
             if (!animation_started) {
