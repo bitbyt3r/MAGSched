@@ -158,7 +158,7 @@ def search(collection):
                     filter(lambda x: x.end_time.timestamp() <= float(end_time), results))
         filtered = [x.serialize() for x in results]
         if not filtered:
-            return _cors(jsonify([]))
+            return []
         prototype = filtered[0]
         for key in prototype.keys():
             if key in request.args:
