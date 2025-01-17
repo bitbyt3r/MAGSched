@@ -142,6 +142,8 @@ def search(collection):
                     start_time = time.time()
                 elif start_time.startswith("+"):
                     start_time = time.time() + float(start_time.split("+")[1])
+                elif start_time.startswith(" "):
+                    start_time = time.time() + float(start_time.split(" ")[1])
                 elif start_time.startswith("-"):
                     start_time = time.time() - float(start_time.split("-")[1])
                 results = list(
@@ -152,6 +154,8 @@ def search(collection):
                     end_time = time.time()
                 elif end_time.startswith("+"):
                     end_time = time.time() + float(end_time.split("+")[1])
+                elif end_time.startswith(" "):
+                    end_time = time.time() + float(end_time.split(" ")[1])
                 elif end_time.startswith("-"):
                     end_time = time.time() - float(end_time.split("-")[1])
                 results = list(
