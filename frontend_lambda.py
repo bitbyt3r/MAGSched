@@ -5,14 +5,17 @@ import time
 import json
 import uuid
 import jinja2
+import magic
 import datetime
 import zoneinfo
 import pytz
-
+import base64
+import os
 
 import database
 import config
 
+mime = magic.Magic(mime=True)
 env = jinja2.Environment(loader=jinja2.FileSystemLoader("templates"))
 client = boto3.client('s3')
 cache = {}
@@ -35,6 +38,7 @@ def lambda_handler(event, context):
     request.method = event.get('requestContext', {}).get('http', {}).get('method', 'GET')
     body = ""
     status = 200
+    encoded = False
     headers = {
         "Content-Type": "application/json"
     }
@@ -76,7 +80,12 @@ def lambda_handler(event, context):
     elif request.path == "/tvguide":
         body = tvguide()
         headers["Content-Type"] = "text/html"
-    
+    elif request.path.startswith("/static/"):
+        filename = os.path.join("static", request.path.split("/static/", 1)[1])
+        headers["Content-Type"] = mime.from_file(filename)
+        with open(filename, "rb") as filehandle:
+            body = base64.b64encode(filehandle.read())
+        encoded = True
     if not body:
         status = 404
         body = "Not Found. See <a href='/'>the docs</a>"
@@ -85,7 +94,8 @@ def lambda_handler(event, context):
     return {
         'statusCode': status,
         'body': body,
-        'headers': headers
+        'headers': headers,
+        'isBase64Encoded': encoded
     }
     
 

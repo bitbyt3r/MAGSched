@@ -4,8 +4,15 @@ import datetime
 import config
 import json
 
+db = None
+try:
+    import redis
+    db = redis.Redis(host=config.redis_host, port=config.redis_port, db=config.redis_db, decode_responses=True)
+except:
+    pass
+
 class Collection(ABC):
-    
+    @classmethod
     def deserialize(cls, string: str):
         return cls.extract(json.loads(string))
 

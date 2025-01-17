@@ -37,9 +37,9 @@ jobs:
       - name: Build venv
         run: |
           mkdir package
-          pip install --target package bs4 lxml pytz jinja2
+          pip install --target package bs4 lxml pytz jinja2 magic
           mv frontend_lambda.py database.py config.py package/
-          cp -r templates package/
+          cp -r templates static package/
           cd package
           zip -r ../lambda.zip .
       - name: Deploy lambda

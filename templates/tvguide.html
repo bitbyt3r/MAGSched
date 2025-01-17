@@ -13,12 +13,13 @@
 
         .toprow {
             align-items: center;
-            background-color: blue;
+            background-image: url("static/background.png");
             display: flex;
             flex-direction: row;
         }
 
-        .stream {
+        .logo {
+            height: 400px;
         }
 
         .advertisement {
@@ -41,6 +42,17 @@
             flex-shrink: 0;
             height: 50px;
             color: white;
+            line-height: 50px;
+            font-size: 35px;
+        }
+
+        #currenttime {
+            position: absolute;
+            flex-shrink: 0;
+            height: 50px;
+            color: white;
+            line-height: 50px;
+            font-size: 40px;
         }
 
         .scheduletable {
@@ -63,8 +75,13 @@
             display: flex;
             flex-direction: column;
             flex-grow: 1;
-            background-color: aqua;
+            width: 100%;
             position: relative;
+            background:
+            repeating-linear-gradient(90deg,
+            #0000 0 196px,
+            black 0 200px);
+            background-position: 3px 0px;
         }
 
         .schedulerow {
@@ -72,22 +89,24 @@
             flex-direction: row;
             display: flex;
             flex-shrink: 0;
-            background-color: blueviolet;
         }
 
         .locationname {
             height: 46px;
             flex-shrink: 0;
-            background-color: chocolate;
+            background-color: darkred;
             border: 2px solid black;
+            color: white;
         }
 
         .session {
             flex-shrink: 0;
             position: absolute;
             height: 46px;
-            background-color: cornflowerblue;
-            border: 2px solid black;
+            background-color: darkblue;
+            border: 2px solid grey;
+            overflow: clip;
+            color: white;
         }
 
         #slider {
@@ -95,6 +114,7 @@
             display: flex;
             left: 0;
             bottom: 0;
+            flex-grow: 1;
         }
 
         .scanlines {
@@ -125,7 +145,7 @@
             background: linear-gradient(
                 to bottom,
                 transparent 50%,
-                rgba(0, 0, 0, 0.3) 51%
+                rgba(0, 0, 0, 0.2) 51%
             );
             background-size: 100% 4px;
             /*animation: scanlines 1s steps(60) infinite;*/
@@ -148,11 +168,7 @@
 <body class="scanlines">
     <div class="toprow">
         <div class="stream">
-            <video id='video' controls='controls' preload='none' poster="https://assets.codepen.io/32795/poster.png">
-                <source id='mp4' src="http://media.w3.org/2010/05/sintel/trailer.mp4" type='video/mp4' />
-                <source id='webm' src="http://media.w3.org/2010/05/sintel/trailer.webm" type='video/webm' />
-                <source id='ogv' src="http://media.w3.org/2010/05/sintel/trailer.ogv" type='video/ogg' />
-            </video>
+            <image src="static/logo.png" class="logo">
         </div>
         <div class="advertisement">
             <h2>Is your festival too small?</h2>
@@ -173,6 +189,7 @@
         let locations_el = document.getElementById("locations");
         let timeline = document.getElementById("timeline");
         let slider = document.getElementById("slider");
+        let currenttime = document.getElementById("currenttime");
         var locations = [];
         var locations_lookup = {};
         var visible_locations = [];
@@ -189,8 +206,9 @@
         ];
 
         const settings = {
-            duration: 1000,
+            duration: 2000,
             iterations: 1,
+            easing: "steps(60)"
         };
 
         function start_animation() {
@@ -247,11 +265,11 @@
                 div.classList.add("schedulerow");
                 let location_div = document.createElement("div");
                 location_div.classList.add("locationname");
-                location_div.innerText = locations_lookup[location].name;
+                location_div.innerText = locations_lookup[location].name.split(' (')[0];
                 locations_el.append(location_div);
                 sessions_in_location.forEach((session) => {
                     let session_start_time = new Date(session.start_time).getTime() / 1000;
-                    session.position = (session_start_time - now) / 3600 * hour_width;
+                    session.position = Math.round((session_start_time - now) / 900)/4 * hour_width;
                     if (session.position < 0) {
                         session.width = session.width + session.position;
                         session.position = 0;
@@ -260,7 +278,7 @@
                         let session_div = document.createElement("div");
                         session_div.classList.add("session");
                         let session_time = new Date(session.start_time).toLocaleTimeString();
-                        session_div.innerText = session.name.slice(0, 32);
+                        session_div.innerText = session.name;
                         session_div.style.left = Math.round(session.position) + 'px';
                         session_div.style.width = Math.round(session.width) + 'px';
                         div.append(session_div);
@@ -269,24 +287,40 @@
                 schedule.append(div);
             }
             
+            var offset = 0;
+            currenttime = document.createElement("div");
+            currenttime.id = "currenttime";
+            currenttime.innerText = new Date().toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
+            timeline.append(currenttime);
             for (let time=start_time; time <= end_time; time += 3600) {
-
                 let div = document.createElement("div");
                 div.classList.add("time");
                 let date = new Date(time * 1000);
-                div.innerText = date.toLocaleTimeString();
+                div.innerText = date.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
                 div.style.width = hour_width + "px";
-                div.style.left = ((time - now) / 3600) * hour_width + 200 + "px";
-                timeline.append(div);
+                div.style.left = Math.round((time - now) / 900) / 4 * hour_width + 200 + "px";
+                offset = (Math.round((time - now) / 900) / 4 * hour_width + 200) % 200;
+                if (Math.round((time - now) / 900) / 4 * hour_width + 200 > 200) {
+                    timeline.append(div);
+                }
             }
-            
+
+            console.log(offset);
+            schedule.style.backgroundPositionX = 3 - offset + "px";
+            console.log(schedule.style.backgroundPositionX);
+
             if (!animation_started) {
                 animation_started = true;
                 start_animation();
             }
         }
         load();
+
+        function updatetime() {
+            currenttime.innerText = new Date().toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
+        }
         setInterval(load, 60000);
+        setInterval(updatetime, 1000);
     </script>
 </body>
 

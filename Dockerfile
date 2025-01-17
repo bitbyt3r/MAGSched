@@ -4,6 +4,7 @@ RUN pip install --upgrade flask redis requests google-api-python-client google-a
 
 ADD backends/ backends/
 ADD templates/ templates/
+ADD static/ static/
 ADD cache_loader.py cache_loader.py
 ADD config.py config.py
 ADD database.py database.py

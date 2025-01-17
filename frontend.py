@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, render_template, make_response
+from flask import Flask, jsonify, request, render_template, make_response, send_from_directory
 from bs4 import BeautifulSoup
 import datetime
 import zoneinfo
@@ -212,6 +212,11 @@ def room(display):
         if location.id == display:
             return render_template("room.html", location=location)
     return f"Unknown location {location}", 404
+
+@app.route("/static/<filename>")
+def staticfile(filename):
+    print(f"Getting staticfile {filename}")
+    return send_from_directory("static", filename)
 
 def make_guid(collection, id):
     url = f"{config.base_url}/{collection}/{id}"
