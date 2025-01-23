@@ -229,7 +229,7 @@
             } else {
                 for (var i = 0; i < sessions.length; i++) {
                     let next = sessions[i];
-                    if (moment(next.start_time).isBefore()) {
+                    if (moment(next.start_time).add(15, 'minutes').isBefore()) {
                         if (moment(next.end_time).isAfter()) {
                             continue
                         }
