@@ -85,28 +85,32 @@
         }
 
         .schedulerow {
-            height: 50px;
+            height: 100px;
             flex-direction: row;
             display: flex;
             flex-shrink: 0;
         }
 
         .locationname {
-            height: 46px;
+            height: 96px;
             flex-shrink: 0;
             background-color: darkred;
             border: 2px solid black;
             color: white;
+            font-size: 24px;
+            padding: 4px;
         }
 
         .session {
             flex-shrink: 0;
             position: absolute;
-            height: 46px;
+            height: 96px;
             background-color: darkblue;
             border: 2px solid grey;
             overflow: clip;
             color: white;
+            font-size: 24px;
+            padding: 4px;
         }
 
         #slider {
@@ -171,9 +175,7 @@
             <image src="static/logo.png" class="logo">
         </div>
         <div class="advertisement">
-            <h2>Is your festival too small?</h2>
-            <h1>CALL NOW!</h1>
-            <h2>Three easy payments!</h2>
+            <h1>View full schedule at<br>schedule.magfest.org</h1>
         </div>
     </div>
     <div id="timeline"></div>
@@ -197,12 +199,12 @@
         var sessions_by_location = {};
         var start_time = Infinity;
         var end_time = 0;
-        let hour_width = 200;
+        let hour_width = 400;
         var animation_started = false;
 
         const keyframes = [
             { transform: "translateY(0)" },
-            { transform: "translateY(-50px)" },
+            { transform: "translateY(-100px)" },
         ];
 
         const settings = {
@@ -233,7 +235,7 @@
             locations.forEach((location) => {
                 locations_lookup[location.id] = location;
             })
-            sessions = await fetch("/sessions?limit=-1&time_range_start=-1800&time_range_end=+28800").then(res => res.json());
+            sessions = await fetch("/sessions?limit=-1&time_range_start=-5400&time_range_end=+28800").then(res => res.json());
             sessions_by_location = {};
             visible_locations = [];
             sessions.forEach((session) => {
@@ -277,8 +279,8 @@
                     if (session.width > 50) {
                         let session_div = document.createElement("div");
                         session_div.classList.add("session");
-                        let session_time = new Date(session.start_time).toLocaleTimeString();
-                        session_div.innerText = session.name;
+                        let session_time = new Date(session.start_time).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
+                        session_div.innerText = session.name +" "+ session_time;
                         session_div.style.left = Math.round(session.position) + 'px';
                         session_div.style.width = Math.round(session.width) + 'px';
                         div.append(session_div);
@@ -299,9 +301,9 @@
                 date.setMinutes(0);
                 div.innerText = date.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
                 div.style.width = hour_width + "px";
-                div.style.left = Math.round((time - now) / 900) / 4 * hour_width + hour_width + "px";
+                div.style.left = Math.round((time - now) / 900) / 4 * hour_width + 200 + "px";
                 offset = (Math.round((time - now) / 900) / 4 * hour_width) % hour_width;
-                if (Math.round((time - now) / 900) / 4 * hour_width + hour_width > hour_width) {
+                if (Math.round((time - now) / 900) / 4 * hour_width > 0) {
                     timeline.append(div);
                 }
             }
