@@ -91,3 +91,15 @@ def test_lambda_handler(client):
     assert response["statusCode"] == 200
     assert response["isBase64Encoded"]
     assert base64.b64decode(response["body"])[:4] == b"\x89PNG"
+
+
+def test_large_responses_gzipped(client, monkeypatch):
+    import frontend
+    monkeypatch.setattr(frontend, "COMPRESS_MIN_BYTES", 10)
+    response = client.get("/frab", headers={"Accept-Encoding": "gzip"})
+    assert response.headers["Content-Encoding"] == "gzip"
+    import gzip
+    assert gzip.decompress(response.data).startswith(b"<?xml")
+    # Without Accept-Encoding the body stays uncompressed
+    response = client.get("/frab", headers={"Accept-Encoding": "identity"})
+    assert "Content-Encoding" not in response.headers

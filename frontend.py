@@ -1,4 +1,5 @@
 import datetime
+import gzip
 import json
 import time
 import traceback
@@ -16,6 +17,25 @@ app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 3600
 cache = {}
 TZ = zoneinfo.ZoneInfo(config.time_zone_name)
+
+
+COMPRESS_MIN_BYTES = 102400
+
+
+@app.after_request
+def compress_large_responses(response):
+    # The ALB in front of the Lambda caps response bodies at 1MB; the full
+    # schedule exceeds that, so compress big responses when the client allows it.
+    if (
+        "gzip" in request.headers.get("Accept-Encoding", "").lower()
+        and not response.direct_passthrough
+        and (response.content_length or 0) > COMPRESS_MIN_BYTES
+        and "Content-Encoding" not in response.headers
+    ):
+        response.set_data(gzip.compress(response.get_data()))
+        response.headers["Content-Encoding"] = "gzip"
+        response.headers["Vary"] = "Accept-Encoding"
+    return response
 
 
 @app.after_request
