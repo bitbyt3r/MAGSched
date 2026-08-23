@@ -1,0 +1,174 @@
+<html>
+
+<head>
+</head>
+
+<body>
+    <style>
+        body {
+            background-color: {{ "rgba(0, 0, 0, 0)" if mode == "display" else "black" }};
+            height: 100%;
+            margin: 0;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: black;
+            opacity: 1;
+            transition: opacity 1s;
+        }
+
+        img {
+            height: auto;
+            width: 90%;
+        }
+
+        .preview {
+            color: white;
+            padding: 2%;
+        }
+
+        .icon {
+            height: auto;
+            width: 20%;
+            bottom: 0;
+            right: 0;
+            position: fixed;
+            padding: 2%;
+        }
+
+        .roomname {
+            font-size: 10vh;
+            padding-bottom: 2vh;
+        }
+
+        .label {
+            font-size: {{ "8vh" if mode == "room" else "10vh" }};
+            font-weight: bold;
+        }
+
+        .sessionname {
+            font-size: {{ "6vh" if mode == "room" else "8vh" }};
+        }
+
+        {% if mode == "room" %}
+        .sessiondescription {
+            font-size: 4vh;
+        }
+
+        {% endif %}
+        .time {
+            font-size: 5vh;
+            position: fixed;
+            bottom: 0;
+            padding-bottom: 2%;
+        }
+    </style>
+    <div class="preview">
+        <div class="roomname" id="roomname">{{location.name}}</div>
+        <hr>
+        <span class="label">{{ "Now: " if mode == "room" else "Up Next: " }}</span>
+        <span class="sessionname" id="sessionname"></span>
+        {% if mode == "room" %}
+        <span class="sessiondescription" id="sessiondescription"></span>
+        {% endif %}
+        <div class="time">{{ "Started" if mode == "room" else "Starting" }} <span id="relative"></span>, <span id="time"></span></div>
+        <div class="icon">
+            <img src="/static/guidebook-icon.svg">
+        </div>
+    </div>
+    {% if mode == "display" %}
+    <div class="logo" id="logo">
+        <img src="/static/magfest-logo.svg">
+    </div>
+    {% endif %}
+    <script type="text/javascript">
+        const MODE = "{{ mode }}";
+        const GRACE_MS = 15 * 60 * 1000;
+        let nameel = document.getElementById("sessionname");
+        let descel = document.getElementById("sessiondescription");
+        let relativeel = document.getElementById("relative");
+        let timeel = document.getElementById("time");
+        let logoel = document.getElementById("logo");
+        var sessions = [];
+
+        function showLogo() {
+            if (logoel) logoel.style.opacity = 1;
+        }
+
+        function hideLogo() {
+            if (logoel) logoel.style.opacity = 0;
+        }
+
+        const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+
+        function fromNow(date) {
+            let seconds = (date.getTime() - Date.now()) / 1000;
+            for (const [unit, size] of [["day", 86400], ["hour", 3600], ["minute", 60]]) {
+                if (Math.abs(seconds) >= size) {
+                    return rtf.format(Math.round(seconds / size), unit);
+                }
+            }
+            return rtf.format(Math.round(seconds), "second");
+        }
+
+        function calendar(date) {
+            const time = date.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
+            const today = new Date();
+            const tomorrow = new Date(today.getTime() + 86400000);
+            if (date.toDateString() === today.toDateString()) return "Today at " + time;
+            if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow at " + time;
+            return date.toLocaleString('en-US', { weekday: 'long' }) + " at " + time;
+        }
+
+        function show(session) {
+            nameel.innerHTML = session.name;
+            if (descel) descel.innerHTML = session.description;
+            let date = new Date(session.start_time);
+            relativeel.innerHTML = fromNow(date);
+            timeel.innerHTML = calendar(date);
+            hideLogo();
+        }
+
+        async function load() {
+            let res = await fetch("/sessions?locations={{location.id}}&limit=-1");
+            sessions = await res.json();
+            refresh();
+        }
+
+        function refresh() {
+            let now = Date.now();
+            for (const session of sessions) {
+                let start = Date.parse(session.start_time);
+                let end = Date.parse(session.end_time);
+                let running = start <= now && now < end;
+                if (MODE === "room") {
+                    // Show the session happening right now.
+                    if (running) return show(session);
+                } else if (MODE === "upnext") {
+                    // Show the next session, counting one that started under 15 minutes ago.
+                    if (start + GRACE_MS >= now) return show(session);
+                } else {
+                    // display: MAGFest logo while a session is running, otherwise the next session.
+                    if (running) return showLogo();
+                    if (start >= now) return show(session);
+                }
+            }
+            showLogo();
+        }
+        load();
+        setInterval(load, 60000);
+        setInterval(refresh, 1000);
+    </script>
+</body>
+
+</html>

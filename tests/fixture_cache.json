@@ -1,0 +1,248 @@
+{
+ "sessions": [
+  {
+   "id": "1",
+   "start_time": "2026-01-22T10:00:00-05:00",
+   "end_time": "2026-01-22T11:00:00-05:00",
+   "all_day": false,
+   "name": "Panel 1",
+   "description": "<p>Description <b>1</b></p>",
+   "locations": [
+    "loc1"
+   ],
+   "tracks": [
+    "t1"
+   ]
+  },
+  {
+   "id": "2",
+   "start_time": "2026-01-22T11:00:00-05:00",
+   "end_time": "2026-01-22T12:00:00-05:00",
+   "all_day": false,
+   "name": "Panel 2",
+   "description": "<p>Description <b>2</b></p>",
+   "locations": [
+    "loc1"
+   ],
+   "tracks": [
+    "t1"
+   ]
+  },
+  {
+   "id": "3",
+   "start_time": "2026-01-22T12:00:00-05:00",
+   "end_time": "2026-01-22T13:00:00-05:00",
+   "all_day": false,
+   "name": "Panel 3",
+   "description": "<p>Description <b>3</b></p>",
+   "locations": [
+    "loc1"
+   ],
+   "tracks": [
+    "t1"
+   ]
+  },
+  {
+   "id": "4",
+   "start_time": "2026-01-22T13:00:00-05:00",
+   "end_time": "2026-01-22T14:00:00-05:00",
+   "all_day": false,
+   "name": "Panel 4",
+   "description": "<p>Description <b>4</b></p>",
+   "locations": [
+    "loc1"
+   ],
+   "tracks": [
+    "t1"
+   ]
+  },
+  {
+   "id": "5",
+   "start_time": "2026-01-22T14:00:00-05:00",
+   "end_time": "2026-01-22T15:00:00-05:00",
+   "all_day": false,
+   "name": "Panel 5",
+   "description": "<p>Description <b>5</b></p>",
+   "locations": [
+    "loc1"
+   ],
+   "tracks": [
+    "t1"
+   ]
+  },
+  {
+   "id": "6",
+   "start_time": "2026-01-22T15:00:00-05:00",
+   "end_time": "2026-01-22T16:00:00-05:00",
+   "all_day": false,
+   "name": "Panel 6",
+   "description": "<p>Description <b>6</b></p>",
+   "locations": [
+    "loc1"
+   ],
+   "tracks": [
+    "t1"
+   ]
+  },
+  {
+   "id": "7",
+   "start_time": "2026-01-22T16:00:00-05:00",
+   "end_time": "2026-01-22T17:00:00-05:00",
+   "all_day": false,
+   "name": "Panel 7",
+   "description": "<p>Description <b>7</b></p>",
+   "locations": [
+    "loc1"
+   ],
+   "tracks": [
+    "t1"
+   ]
+  },
+  {
+   "id": "8",
+   "start_time": "2026-01-22T17:00:00-05:00",
+   "end_time": "2026-01-22T18:00:00-05:00",
+   "all_day": false,
+   "name": "Panel 8",
+   "description": "<p>Description <b>8</b></p>",
+   "locations": [
+    "loc1"
+   ],
+   "tracks": [
+    "t1"
+   ]
+  },
+  {
+   "id": "9",
+   "start_time": "2026-01-22T18:00:00-05:00",
+   "end_time": "2026-01-22T19:00:00-05:00",
+   "all_day": false,
+   "name": "Panel 9",
+   "description": "<p>Description <b>9</b></p>",
+   "locations": [
+    "loc1"
+   ],
+   "tracks": [
+    "t1"
+   ]
+  },
+  {
+   "id": "10",
+   "start_time": "2026-01-22T19:00:00-05:00",
+   "end_time": "2026-01-22T20:00:00-05:00",
+   "all_day": false,
+   "name": "Panel 10",
+   "description": "<p>Description <b>10</b></p>",
+   "locations": [
+    "loc1"
+   ],
+   "tracks": [
+    "t1"
+   ]
+  },
+  {
+   "id": "11",
+   "start_time": "2026-01-22T20:00:00-05:00",
+   "end_time": "2026-01-22T21:00:00-05:00",
+   "all_day": false,
+   "name": "Panel 11",
+   "description": "<p>Description <b>11</b></p>",
+   "locations": [
+    "loc1"
+   ],
+   "tracks": [
+    "t1"
+   ]
+  },
+  {
+   "id": "12",
+   "start_time": "2026-01-22T21:00:00-05:00",
+   "end_time": "2026-01-22T22:00:00-05:00",
+   "all_day": false,
+   "name": "Panel 12",
+   "description": "<p>Description <b>12</b></p>",
+   "locations": [
+    "loc1"
+   ],
+   "tracks": [
+    "t1"
+   ]
+  },
+  {
+   "id": "13",
+   "start_time": "2026-01-23T10:00:00-05:00",
+   "end_time": "2026-01-23T11:00:00-05:00",
+   "all_day": true,
+   "name": "No Description",
+   "description": null,
+   "locations": [
+    "loc2"
+   ],
+   "tracks": []
+  },
+  {
+   "id": "14",
+   "start_time": "2026-01-23T11:00:00-05:00",
+   "end_time": "2026-01-23T12:00:00-05:00",
+   "all_day": false,
+   "name": "Homeless Session",
+   "description": "<p>Nowhere</p>",
+   "locations": [],
+   "tracks": []
+  },
+  {
+   "id": "15",
+   "start_time": "2026-01-23T12:00:00-05:00",
+   "end_time": "2026-01-23T13:00:00-05:00",
+   "all_day": false,
+   "name": "Lost Session",
+   "description": "<p>Where?</p>",
+   "locations": [
+    "999"
+   ],
+   "tracks": []
+  },
+  {
+   "id": "16",
+   "start_time": "2026-01-22T10:00:00-05:00",
+   "end_time": "2026-01-23T12:00:00-05:00",
+   "all_day": false,
+   "name": "Marathon",
+   "description": "<p>26 hours</p>",
+   "locations": [
+    "loc2"
+   ],
+   "tracks": [
+    "t1"
+   ]
+  },
+  {
+   "id": "abc-17",
+   "start_time": "2026-01-23T14:00:00-05:00",
+   "end_time": "2026-01-23T15:00:00-05:00",
+   "all_day": false,
+   "name": "Weird ID",
+   "description": "<p>ID is a string</p>",
+   "locations": [
+    "loc2"
+   ],
+   "tracks": []
+  }
+ ],
+ "locations": [
+  {
+   "id": "loc1",
+   "name": "Panels 1"
+  },
+  {
+   "id": "loc2",
+   "name": "Main Stage"
+  }
+ ],
+ "tracks": [
+  {
+   "id": "t1",
+   "name": "Arcade"
+  }
+ ]
+}

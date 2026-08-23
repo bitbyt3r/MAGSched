@@ -13,7 +13,7 @@
 
         .toprow {
             align-items: center;
-            background-image: url("static/background.png");
+            background-image: url("/static/background.png");
             display: flex;
             flex-direction: row;
         }
@@ -121,61 +121,16 @@
             flex-grow: 1;
         }
 
-        .scanlines {
-            overflow: hidden;
-            position: relative;
-        }
-        .scanlines:before,
-        .scanlines:after {
-            display: block;
-            pointer-events: none;
-            content: "";
-            position: absolute;
-        }
-        .scanlines:before {
-            width: 100%;
-            height: 2px;
-            z-index: 2147483649;
-            background: rgba(0, 0, 0, 0.3);
-            opacity: 0.5;
-            animation: scanline 6s linear infinite;
-        }
-        .scanlines:after {
-            top: 0;
-            right: 0;
-            bottom: 0;
-            left: 0;
-            z-index: 2147483648;
-            background: linear-gradient(
-                to bottom,
-                transparent 50%,
-                rgba(0, 0, 0, 0) 51%
-            );
-            background-size: 100% 4px;
-            /*animation: scanlines 1s steps(60) infinite;*/
-        }
-
-        /* ANIMATE UNIQUE SCANLINE */
-        @keyframes scanline {
-            0% {
-                transform: translate3d(0, 200000%, 0);
-            }
-        }
-        @keyframes scanlines {
-            0% {
-                background-position: 0 50%;
-            }
-        }
     </style>
 </head>
 
-<body class="scanlines">
+<body>
     <div class="toprow">
         <div class="stream">
-            <image src="static/logo.png" class="logo">
+            <img src="/static/logo.png" class="logo">
         </div>
         <div class="advertisement">
-            <h1>View full schedule at<br>schedule.magfest.org</h1>
+            <h1>View full schedule at<br>{{ schedule_host }}</h1>
         </div>
     </div>
     <div id="timeline"></div>
@@ -217,6 +172,10 @@
             let animation = slider.animate(keyframes, settings);
 
             function update_schedule(event) {
+                if (!schedule.children.length) {
+                    animation.play();
+                    return;
+                }
                 let firstrow = schedule.children[0];
                 schedule.removeChild(firstrow);
                 schedule.append(firstrow);
@@ -308,9 +267,7 @@
                 }
             }
 
-            console.log(offset);
             schedule.style.backgroundPositionX = offset - hour_width + 2 + "px";
-            console.log(schedule.style.backgroundPositionX);
 
             if (!animation_started) {
                 animation_started = true;

@@ -1,366 +1,298 @@
-from flask import Flask, jsonify, request, render_template, make_response, send_from_directory
-from bs4 import BeautifulSoup
 import datetime
-import zoneinfo
-import time
-import uuid
-import pytz
 import json
+import time
+import traceback
+import uuid
+import xml.etree.ElementTree as ET
+import zoneinfo
+from html.parser import HTMLParser
 
-import database
+from flask import Flask, jsonify, make_response, render_template, request
+
 import config
+import models
 
 app = Flask(__name__)
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
-app.debug = True
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 3600
 cache = {}
+TZ = zoneinfo.ZoneInfo(config.time_zone_name)
 
-def _build_cors_preflight_response():
-    response = make_response()
-    response.headers.add("Access-Control-Allow-Origin", "*")
-    response.headers.add("Access-Control-Allow-Headers", "*")
-    response.headers.add("Access-Control-Allow-Methods", "*")
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "*"
     return response
 
-def _cors(response):
-    response.headers.add("Access-Control-Allow-Origin", "*")
-    return response
+
+class _TextExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.parts = []
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+
+def strip_html(text):
+    if not text:
+        return ""
+    parser = _TextExtractor()
+    parser.feed(text)
+    return "".join(parser.parts)
+
+
+def load_cache():
+    if config.cache_file:
+        with open(config.cache_file) as filehandle:
+            return json.load(filehandle)
+    if "s3" not in cache:
+        import boto3
+        cache["s3"] = boto3.client("s3")
+    data = cache["s3"].get_object(Bucket=config.cache_bucket, Key=config.cache_key)['Body'].read()
+    return json.loads(data)
+
+
+def shift_onto_now(sessions):
+    """TIME_LOOP: replay the schedule endlessly by shifting it forward onto the current time."""
+    if not sessions:
+        return
+    start = min(x.start_time for x in sessions)
+    end = max(x.end_time for x in sessions)
+    event_duration = end - start
+    if not event_duration:
+        return
+    time_since_start = datetime.datetime.now(datetime.UTC) - start
+    time_offset = event_duration * (time_since_start // event_duration)
+    for session in sessions:
+        session.start_time += time_offset
+        session.end_time += time_offset
+
+
+def get_collection(collection):
+    if collection not in ("sessions", "locations", "tracks"):
+        return None
+    if time.time() - cache.get("age", 0) > 15:
+        try:
+            resources = load_cache()
+            sessions = [models.Session.extract(x) for x in resources.get("sessions", [])]
+            if config.time_loop:
+                shift_onto_now(sessions)
+            cache["sessions"] = sessions
+            cache["locations"] = [models.Location.extract(x) for x in resources.get("locations", [])]
+            cache["tracks"] = [models.Track.extract(x) for x in resources.get("tracks", [])]
+        except Exception:
+            # Keep serving the previous cache; retry on the next refresh window.
+            traceback.print_exc()
+        cache["age"] = time.time()
+    return cache.get(collection, [])
+
+
+def parse_time(spec):
+    """A time_range argument: epoch seconds, "now", or +/-N seconds relative to now."""
+    if not spec:
+        return None
+    if spec == "now":
+        return time.time()
+    if spec[0] == " ":  # a leading '+' that URL decoding turned into a space
+        spec = "+" + spec[1:]
+    if spec[0] in "+-":
+        return time.time() + float(spec)
+    return float(spec)
+
+
+def search(collection, default_limit=10):
+    results = get_collection(collection)
+    if results is None:
+        return None
+    if collection == "sessions":
+        start_time = parse_time(request.args.get("time_range_start"))
+        if start_time is not None:
+            results = [x for x in results if x.start_time.timestamp() >= start_time]
+        end_time = parse_time(request.args.get("time_range_end"))
+        if end_time is not None:
+            results = [x for x in results if x.end_time.timestamp() <= end_time]
+    filtered = [x.serialize() for x in results]
+    if not filtered:
+        return []
+    prototype = filtered[0]
+    for key, value in request.args.items():
+        if key not in prototype:
+            continue
+        if isinstance(prototype[key], list):
+            filtered = [x for x in filtered if value in x[key]]
+        elif isinstance(prototype[key], bool):
+            filtered = [x for x in filtered if x[key] == (value.lower() == "true")]
+        else:
+            filtered = [x for x in filtered if x[key] == value]
+    default_sort = "start_time" if collection == "sessions" else "name"
+    filtered.sort(key=lambda x: x.get(request.args.get("sort", default_sort)))
+    if collection == "sessions":
+        for session in filtered:
+            session["description"] = strip_html(session["description"])
+    if request.args.get("reverse", "false").lower() == "true":
+        filtered.reverse()
+    filtered = filtered[int(request.args.get("offset", 0)):]
+    limit = int(request.args.get("limit", default_limit))
+    if limit > 0:
+        filtered = filtered[:limit]
+    return filtered
+
 
 @app.route("/")
 def root():
     return render_template("index.html")
 
-def get_collection(collection):
-    age = cache.get(collection+"-age")
-    if (not age) or (time.time() - age > 15):
-        if collection == "sessions":
-            results = list(database.Session.get())
-            if config.time_loop:
-                start = None
-                end = None
-                for result in results:
-                    if not start or result.start_time < start:
-                        start = result.start_time
-                    if not end or result.end_time > end:
-                        end = result.end_time
-                if start and end:
-                    event_duration = end - start
-                    time_since_start = datetime.datetime.utcnow().replace(tzinfo=zoneinfo.ZoneInfo('UTC')) - start
-                    time_offset = event_duration * (time_since_start // event_duration)
-                    for result in results:
-                        result.start_time += time_offset
-                        result.end_time += time_offset
-        elif collection == "tracks":
-            results = list(database.Track.get())
-        elif collection == "locations":
-            results = list(database.Location.get())
-        else:
-            return None
-        cache[collection+"-age"] = time.time()
-        cache[collection] = results
-        return results
-    return cache.get(collection)
 
-def search(collection):
+@app.route("/<collection>")
+def search_collection(collection):
+    results = search(collection)
+    if results is None:
+        return f"Unknown datatype {collection}", 404
+    return jsonify(results)
+
+
+@app.route("/<collection>/<item>")
+def retrieve(collection, item):
     results = get_collection(collection)
-    if results is not None:
-        if not results:
-            return []
-        if collection == "sessions":
-            start_time = request.args.get("time_range_start")
-            if start_time:
-                if start_time == "now":
-                    start_time = time.time()
-                elif start_time.startswith("+"):
-                    start_time = time.time() + float(start_time.split("+")[1])
-                elif start_time.startswith(" "):
-                    start_time = time.time() + float(start_time.split(" ")[1])
-                elif start_time.startswith("-"):
-                    start_time = time.time() - float(start_time.split("-")[1])
-                results = list(
-                    filter(lambda x: x.start_time.timestamp() >= float(start_time), results))
-            end_time = request.args.get("time_range_end")
-            if end_time:
-                if end_time == "now":
-                    end_time = time.time()
-                elif end_time.startswith("+"):
-                    end_time = time.time() + float(end_time.split("+")[1])
-                elif end_time.startswith(" "):
-                    end_time = time.time() + float(end_time.split(" ")[1])
-                elif end_time.startswith("-"):
-                    end_time = time.time() - float(end_time.split("-")[1])
-                results = list(
-                    filter(lambda x: x.end_time.timestamp() <= float(end_time), results))
-        filtered = [x.serialize() for x in results]
-        if not filtered:
-            return []
-        prototype = filtered[0]
-        for key in prototype.keys():
-            if key in request.args:
-                if isinstance(prototype[key], list):
-                    print(f"Filtering on {key} in {request.args[key]}")
-                    filtered = list(
-                        filter(lambda x: request.args.get(key) in x[key], filtered))
-                elif isinstance(prototype[key], bool):
-                    print(f"Filtering on {key} == True")
-                    filtered = list(
-                        filter(lambda x: x[key] == (request.args.get(key).lower() == "true"), filtered)
-                    )
-                else:
-                    print(f"Filtering on {key} == {request.args[key]}")
-                    filtered = list(
-                        filter(lambda x: x[key] == request.args.get(key), filtered))
-        final = list(filtered)
-        if collection == "sessions":
-            final.sort(key=lambda x: x.get(
-                request.args.get("sort", "start_time")))
-            for session in final:
-                if "description" in session:
-                    session['description'] = BeautifulSoup(session['description']).get_text()
-        else:
-            final.sort(key=lambda x: x.get(request.args.get("sort", "name")))
-        if request.args.get("reverse", "false").lower() == "true":
-            final.reverse()
-        final = final[int(request.args.get("offset", 0)):]
-        limit = int(request.args.get("limit", 10))
-        if limit > 0:
-            final = final[:limit]
-        return final
-    return []
+    if results is None:
+        return f"Unknown datatype {collection}", 404
+    for result in results:
+        if result.id == item:
+            return jsonify(result.serialize())
+    return f"Could not find {item} in {collection}", 404
 
-@app.route("/bops-graphics", methods=["GET", "OPTIONS"])
+
+@app.route("/bops-graphics")
 def bops_graphics():
-    if request.method == "OPTIONS":
-        return _build_cors_preflight_response()
-    sessions = search("sessions")
-    locations = get_collection("locations")
-    location_lookup = {x.id: x for x in locations}
+    location_lookup = {x.id: x for x in get_collection("locations")}
     formatted = []
-    for session in sessions:
+    for session in search("sessions"):
+        location = location_lookup.get(session['locations'][0]) if session['locations'] else None
         formatted.append({
-            "start_time": datetime.datetime.fromisoformat(session['start_time']).astimezone(pytz.timezone(config.time_zone_name)).strftime("%-I:%M %p"),
-            "end_time": datetime.datetime.fromisoformat(session['end_time']).astimezone(pytz.timezone(config.time_zone_name)).strftime("%-I:%M %p"),
+            "start_time": datetime.datetime.fromisoformat(session['start_time']).astimezone(TZ).strftime("%-I:%M %p"),
+            "end_time": datetime.datetime.fromisoformat(session['end_time']).astimezone(TZ).strftime("%-I:%M %p"),
             "id": session['id'],
-            "location": location_lookup[session['locations'][0]].name,
+            "location": location.name if location else "",
             "name": session['name'],
         })
-    return _cors(jsonify(formatted))
-
-@app.route("/<collection>", methods=["GET", "OPTIONS"])
-def search_collection(collection):
-    if request.method == "OPTIONS":
-        return _build_cors_preflight_response()
-    results = search(collection)
-    if results is not None:
-        return _cors(jsonify(results))
-    else:
-        return f"Unknown datatype {collection}", 404
-
-
-@app.route("/<collection>/<item>", methods=["GET", "OPTIONS"])
-def retrieve(collection, item):
-    if request.method == "OPTIONS":
-        return _build_cors_preflight_response()
-    results = get_collection(collection)
-    if results is not None:
-        for result in results:
-            if result.id == item:
-                return _cors(jsonify(result.serialize()))
-        return f"Could not find {item} in {collection}", 404
-    else:
-        return f"Unknown datatype {collection}", 404
+    return jsonify(formatted)
 
 
 @app.route("/display")
-def displaylist():
-    locations = get_collection("locations")
-    return render_template("displaylist.html", locations=locations)
+@app.route("/upnext")
+@app.route("/room")
+def signage_list():
+    view = request.path.strip("/")
+    return render_template("viewlist.html", view=view, locations=get_collection("locations"))
 
 
 @app.route("/display/<display>")
-def display(display):
-    locations = get_collection("locations")
-    for location in locations:
+@app.route("/upnext/<display>")
+@app.route("/room/<display>")
+def signage(display):
+    mode = request.path.split("/")[1]
+    for location in get_collection("locations"):
         if location.id == display:
-            return render_template("display.html", location=location)
+            return render_template("signage.html", mode=mode, location=location)
     return f"Unknown location {display}", 404
 
 
-@app.route("/upnext")
-def upnextlist():
-    locations = get_collection("locations")
-    return render_template("upnextlist.html", locations=locations)
-
-
-@app.route("/upnext/<display>")
-def upnext(display):
-    locations = get_collection("locations")
-    for location in locations:
-        if location.id == display:
-            return render_template("upnext.html", location=location)
-    return f"Unknown location {location}", 404
-
-@app.route("/room")
-def roomlist():
-    locations = get_collection("locations")
-    return render_template("roomlist.html", locations=locations)
-
 @app.route("/tvguide")
 def tvguide():
-    return render_template("tvguide.html", locations=[])
+    return render_template("tvguide.html", schedule_host=config.base_url.split("//")[-1])
 
-@app.route("/room/<display>")
-def room(display):
-    locations = get_collection("locations")
-    for location in locations:
-        if location.id == display:
-            return render_template("room.html", location=location)
-    return f"Unknown location {location}", 404
-
-@app.route("/static/<filename>")
-def staticfile(filename):
-    print(f"Getting staticfile {filename}")
-    return send_from_directory("static", filename)
 
 def make_guid(collection, id):
-    url = f"{config.base_url}/{collection}/{id}"
-    gid = uuid.uuid3(uuid.NAMESPACE_URL, url)
-    return str(gid)
+    return str(uuid.uuid3(uuid.NAMESPACE_URL, f"{config.base_url}/{collection}/{id}"))
+
+
+EVENT_TAGS = [
+    "date", "start", "duration", "room", "slug", "url", "title", "subtitle", "track",
+    "type", "language", "abstract", "description", "logo", "persons", "links", "attachments"
+]
+
 
 def sessions_to_frab(sessions):
-    locations = get_collection("locations")
-    location_lookup = {x.id: x for x in locations}
-    soup = BeautifulSoup(features='xml')
-    schedule = soup.new_tag("schedule")
-    soup.append(schedule)
-    generator = soup.new_tag("generator", attrs={"name": "magsched", "version": "1.0"})
-    schedule.append(generator)
-    version = soup.new_tag("version")
-    schedule.append(version)
-    version.string = "Guidebook"
-    conference = soup.new_tag("conference")
-    schedule.append(conference)
-    for tagname in [
-        "acronym",
-        "title",
-        "start",
-        "end",
-        "days",
-        "timeslot_duration",
-        "time_zone_name",
-        "base_url"
-    ]:
-        tag = soup.new_tag(tagname)
-        conference.append(tag)
-        tag.string = getattr(config, tagname)
+    location_lookup = {x.id: x for x in get_collection("locations")}
+    schedule = ET.Element("schedule")
+    ET.SubElement(schedule, "generator", name="magsched", version="1.0")
+    ET.SubElement(schedule, "version").text = "Guidebook"
+    conference = ET.SubElement(schedule, "conference")
+    for tagname in ["acronym", "title", "start", "end", "days", "timeslot_duration", "time_zone_name", "base_url"]:
+        ET.SubElement(conference, tagname).text = getattr(config, tagname)
     days = {}
     for session in sessions:
-        day = session.start_time.astimezone(pytz.timezone(config.time_zone_name)).strftime("%Y-%m-%d")
-        if not day in days:
+        local_start = session.start_time.astimezone(TZ)
+        day = local_start.strftime("%Y-%m-%d")
+        if day not in days:
             days[day] = {
                 "date": day,
-                "start": session.start_time.astimezone(pytz.timezone(config.time_zone_name)).replace(hour=0, minute=0, second=0, microsecond=0).isoformat(),
-                "end": session.start_time.astimezone(pytz.timezone(config.time_zone_name)).replace(hour=23, minute=45, second=0, microsecond=0).isoformat(),
+                "start": local_start.replace(hour=0, minute=0, second=0, microsecond=0).isoformat(),
+                "end": local_start.replace(hour=23, minute=45, second=0, microsecond=0).isoformat(),
                 "rooms": {}
             }
+        description = strip_html(session.description)
+        duration = int((session.end_time - session.start_time).total_seconds())
         for location in session.locations:
-            if not location in days[day]["rooms"]:
-                if not location in location_lookup:
-                    print(f"session {session.id} has invalid location {location}")
-                    continue
-                days[day]["rooms"][location] = {
-                    "id": location,
-                    "name": location_lookup[location].name,
-                    "events": [] 
-                }
-            duration = (session.end_time - session.start_time).seconds
-            days[day]["rooms"][location]["events"].append({
+            if location not in location_lookup:
+                print(f"session {session.id} has invalid location {location}")
+                continue
+            room = days[day]["rooms"].setdefault(location, {
+                "id": location,
+                "name": location_lookup[location].name,
+                "events": []
+            })
+            room["events"].append({
                 "id": session.id,
-                "date": session.start_time.astimezone(pytz.timezone(config.time_zone_name)).isoformat(),
-                "start": session.start_time.astimezone(pytz.timezone(config.time_zone_name)).strftime("%H:%M"),
-                "duration": f"{duration // 3600}:{int((duration % 3600)/60):02}",
-                "room": location_lookup[location].name,
-                "slug": f"{config.acronym}-{int(session.id) % 1000000}-sess",
+                "date": local_start.isoformat(),
+                "start": local_start.strftime("%H:%M"),
+                "duration": f"{duration // 3600}:{(duration % 3600) // 60:02}",
+                "room": room["name"],
+                "slug": f"{config.acronym}-{session.id}-sess",
                 "url": f"{config.base_url}/sessions/{session.id}",
                 "title": session.name,
-                "subtitle": "",
                 "track": session.tracks[0] if session.tracks else "",
-                "type": "",
                 "language": "en",
-                "abstract": BeautifulSoup(session.description).get_text(),
-                "description": BeautifulSoup(session.description).get_text(),
+                "abstract": description,
+                "description": description,
                 "logo": "https://www.magfest.org/assets/logo_magfest_lg.png",
-                "persons": "",
-                "links": "",
-                "attachments": ""
             })
-    day_list = list(days.values())
-    day_list.sort(key=lambda x: x['start'])
-    for idx, day in enumerate(day_list):
-        day_tag = soup.new_tag("day", date=day['date'], end=day['end'], index=str(idx+1), start=day['start'])
-        schedule.append(day_tag)
+    for idx, day in enumerate(sorted(days.values(), key=lambda x: x['start'])):
+        day_tag = ET.SubElement(schedule, "day", date=day['date'], end=day['end'], index=str(idx + 1), start=day['start'])
         for room in day['rooms'].values():
-            room_tag = soup.new_tag("room", guid=make_guid("locations", room['id']))
-            room_tag.attrs["name"] = room['name']
-            day_tag.append(room_tag)
+            room_tag = ET.SubElement(day_tag, "room", guid=make_guid("locations", room['id']), name=room['name'])
             for event in room['events']:
-                event_tag = soup.new_tag("event", guid=make_guid("sessions", event['id']), id=str(event['id']))
-                room_tag.append(event_tag)
-                for tagname in [
-                    "date",
-                    "start",
-                    "duration",
-                    "room",
-                    "slug",
-                    "url",
-                    "title",
-                    "subtitle",
-                    "track",
-                    "type",
-                    "language",
-                    "abstract",
-                    "description",
-                    "logo",
-                    "persons",
-                    "links",
-                    "attachments"
-                ]:
-                    tag = soup.new_tag(tagname)
-                    event_tag.append(tag)
-                    tag.string = event.get(tagname, "")
-                recording = soup.new_tag("recording")
-                event_tag.append(recording)
-                license = soup.new_tag("license")
-                recording.append(license)
-                optout = soup.new_tag("optout")
-                recording.append(optout)
-                optout.string = "false"
-    return soup
+                event_tag = ET.SubElement(room_tag, "event", guid=make_guid("sessions", event['id']), id=str(event['id']))
+                for tagname in EVENT_TAGS:
+                    ET.SubElement(event_tag, tagname).text = event.get(tagname, "")
+                recording = ET.SubElement(event_tag, "recording")
+                ET.SubElement(recording, "license")
+                ET.SubElement(recording, "optout").text = "false"
+    return '<?xml version="1.0" encoding="utf-8"?>\n' + ET.tostring(schedule, encoding="unicode")
 
-@app.route("/frab", methods=["GET", "OPTIONS"])
+
+def xml_response(body):
+    response = make_response(body)
+    response.mimetype = "text/xml"
+    return response
+
+
+@app.route("/frab")
 def frab():
-    if request.method == "OPTIONS":
-        return _build_cors_preflight_response()
-    age = cache.get("frab-age")
-    if (not age) or (time.time() - age > 60):
-        sessions = get_collection("sessions")
-        sessions.sort(key=lambda x: x.start_time)
-        soup = sessions_to_frab(sessions)
-        full_frab = str(soup)
-        cache["frab"] = full_frab
+    if time.time() - cache.get("frab-age", 0) > 60:
+        sessions = sorted(get_collection("sessions"), key=lambda x: x.start_time)
+        cache["frab"] = sessions_to_frab(sessions)
         cache["frab-age"] = time.time()
-    else:
-        full_frab = cache.get("frab")
+    return xml_response(cache["frab"])
 
-    response = _cors(make_response(full_frab))
-    response.mimetype = "text/xml"
-    return response
 
-@app.route("/frab/filtered", methods=["GET", "OPTIONS"])
+@app.route("/frab/filtered")
 def frab_filtered():
-    if request.method == "OPTIONS":
-        return _build_cors_preflight_response()
-    results = [database.Session.deserialize(json.dumps(x)) for x in search("sessions")]
-    response = _cors(make_response(str(sessions_to_frab(results))))
-    response.mimetype = "text/xml"
-    return response
+    results = [models.Session.extract(x) for x in search("sessions", default_limit=-1)]
+    return xml_response(sessions_to_frab(results))
+
+
+from apig_wsgi import make_lambda_handler
+lambda_handler = make_lambda_handler(app, binary_support=True)

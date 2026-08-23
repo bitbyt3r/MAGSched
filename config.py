@@ -1,18 +1,19 @@
 import os
-import json
 
-backends = json.loads(os.environ.get("BACKENDS", '[]'))
-redis_host = os.environ.get("REDIS_HOST", "localhost")
-redis_port = int(os.environ.get("REDIS_PORT", "6379"))
-redis_db = int(os.environ.get("REDIS_DB", "0"))
-refresh_delay = float(os.environ.get("REFRESH_DELAY", "60"))
-time_loop = bool(os.environ.get("TIME_LOOP", "false").lower() == "true")
-time_zone = os.environ.get("TIME_ZONE", "America/New_York")
+time_loop = os.environ.get("TIME_LOOP", "false").lower() == "true"
 
-acronym = os.environ.get("ACRONYM", "super2025")
-title = os.environ.get("TITLE", "Super MAGFest 2025")
-start = os.environ.get("START", "2025-01-23")
-end = os.environ.get("END", "2025-01-26")
+cache_bucket = os.environ.get("CACHE_BUCKET", "magsched-cache")
+cache_key = os.environ.get("CACHE_KEY", "cache.json")
+# When set, read/write the cache from this local file instead of S3 (local dev and tests).
+cache_file = os.environ.get("CACHE_FILE", "")
+
+guidebook_api_key = os.environ.get("GUIDEBOOK_API_KEY", "")
+guidebook_guide = os.environ.get("GUIDEBOOK_GUIDE", "")
+
+acronym = os.environ.get("ACRONYM", "super2026")
+title = os.environ.get("TITLE", "Super MAGFest 2026")
+start = os.environ.get("START", "2026-01-22")
+end = os.environ.get("END", "2026-01-25")
 days = os.environ.get("DAYS", "4")
 timeslot_duration = os.environ.get("TIMESLOT_DURATION", "00:15")
 time_zone_name = os.environ.get("TIME_ZONE_NAME", "America/New_York")

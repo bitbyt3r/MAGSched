@@ -1,59 +1,46 @@
 # MAGSched
 
-Schedule caching server supporting multiple upstreams.
+Schedule caching server for MAGFest.
 
-The main goal is to avoid having any API usage limits that external providers impose by self hosting a local copy of the schedule. Additionally, it provides a very simple interface for downstream consumers.
+The main goal is to avoid any API usage limits that external providers impose by self hosting a copy of the schedule. Additionally, it provides a very simple interface for downstream consumers: digital signage, broadcast graphics, and Frab-compatible tools.
+
+## Architecture
+
+Two AWS Lambda functions share one deployment package, built and deployed by `.github/workflows/deploy.yaml` on pushes to `main` (tests run first, and on every pull request):
+
+* **`magsched_guidebook_loader`** (`loader.lambda_handler`) — invoked on a schedule; pulls sessions, locations, and schedule tracks from the Guidebook Open API and writes `cache.json` to S3. A failed refresh raises (visible in CloudWatch) and leaves the previous cache in place.
+* **`magsched_guidebook_frontend`** (`frontend.lambda_handler`) — a Flask app served through API Gateway via `apig-wsgi`; reads `cache.json` from S3 (memoized for ~15 seconds per warm container) and serves the API and display pages below.
 
 ## Configuration
 
-The following environment variables are used to configure the backend:
+Environment variables:
 
-* REDIS_HOST - The IP/hostname of the redis instance
-* REDIS_PORT - The port to use for redis
-* REDIS_DB - The DB number to use for redis (generally a number from 0-15)
-* REFRESH_DELAY - How long to wait between backend polls
-* BACKENDS - A json string specifying which backend services to pull from in ascending order of priority
+* `GUIDEBOOK_API_KEY` - Guidebook Open API key (loader only). Guidebook does not have permission controls on API keys, so be very careful with them.
+* `GUIDEBOOK_GUIDE` - The guide number to pull, as a string
+* `CACHE_BUCKET` / `CACHE_KEY` - S3 location of the cache (defaults: `magsched-cache` / `cache.json`)
+* `CACHE_FILE` - When set, read/write the cache from this local file instead of S3 (local development)
+* `TIME_LOOP` - Set to `true` to replay the cached schedule endlessly, shifted onto the current time (for testing displays)
+* `TIME_ZONE_NAME` - Timezone used for display and the Frab feed (default `America/New_York`)
+* `ACRONYM`, `TITLE`, `START`, `END`, `DAYS`, `TIMESLOT_DURATION`, `BASE_URL` - Conference metadata included in the `/frab` feed
 
-BACKENDS takes a list of objects in this format:
-```json
-[
-    {
-        "name": "Test Guidebook",
-        "type": "guidebook",
-        "apikey": "aaaabbbbccccddddeeeeffff.aaaabbbbccccddddeeeeffff",
-        "guide": "183391"
-    },
-    {
-        "name": "Google Sheet",
-        "type": "sheets",
-        "sheet": "1dTp07uGTokckyXtNUGLRnK634twzaaKUF0Rp8XQGl20",
-        "key": "aaaabbbbccccddddeeeeffff",
-        "credentials": ""
-    }
-]
+## Local development
+
+```
+pip install -r requirements-dev.txt
+pytest
+CACHE_FILE=tests/fixture_cache.json TIME_LOOP=true flask --app frontend run
 ```
 
-Currently, `sheets` and `guidebook` types are supported. Data pulled from services later in the list of backends will override data from earlier ones if they contain the same IDs. In this example, you could use Google Sheets to add or edit schedule entries from Guidebook.
+To pull a real cache locally, set `CACHE_FILE`, `GUIDEBOOK_API_KEY`, and `GUIDEBOOK_GUIDE` and run `python loader.py`.
 
-### Guidebook Configuration
+## Displays
 
-Guidebook requires an API key and a guide number, both as strings. Guidebook does not have permissions controls on API keys, so be very careful with them.
+* [/display](/display) - Panel displays: a broadcast overlay showing the next session in a room
+* [/upnext](/upnext) - Up next displays: the next session in a room (counting one that started under 15 minutes ago)
+* [/room](/room) - Room displays: the session currently running in a room, with its description
+* [/tvguide](/tvguide) - A scrolling TV-guide-style schedule grid of all rooms
 
-### Google Sheets Configuration
-
-Google sheets requires a sheet ID which can be pulled from the URL of a sheet.
-
-Additionally it requires a Google developer API key. See https://developers.google.com/sheets/api/quickstart/python for docs on setting up a key for this.
-
-Finally, sheets requires credentials that have been authorized to access the user's account. If you start the server locally with credentials set to an empty string it will launch a browser window interactively to allow you to authorize it to access sheets on your account. Once that is complete, it will save the session key to the database and continually refresh it. It will also print out the value needed for this variable so that you can copy it to a remote server. If this server gets any serious use I'll probably implement the flow server side, but it should be at most a once per year thing.
-
-## Panel Displays
-
-To access the panel displays go <a href="/display">here</a> then select the appropriate location.
-
-## Up Next Displays
-
-To access the up next displays go <a href="/upnext">here</a> then select the appropriate location.
+Each of `/display`, `/upnext`, and `/room` lists the locations to choose from.
 
 ## API
 
@@ -78,7 +65,7 @@ Returns a list of sessions that are scheduled.
 | all_day          |            | Filter results by whether they are All Day events (TRUE/FALSE)  |
 | description      |            | Filter results to match an exact description                    |
 | locations        |            | Filter results by whether they include a location in their list |
-| schedule_tracks  |            | Filter results by whether they include a track in their list    |
+| tracks           |            | Filter results by whether they include a track in their list    |
 
 `time_range_start` and `time_range_end` allow you to request results from a range of time. You can specify the endpoints in a few ways.
 
@@ -91,9 +78,7 @@ To get the next hour of events use `time_range_start=now&time_range_end=+3600` f
 
 ### GET /bops-graphics
 
-Returns a list of sessions that are schedule, but in a broadcast-friendly format.
-
-Accepts all the same arguments as `/sessions` above.
+Returns a list of sessions that are scheduled, but in a broadcast-friendly format. Accepts all the same arguments as `/sessions` above.
 
 Returns a simplified object:
 ```json
@@ -104,52 +89,24 @@ Returns a simplified object:
     "location": "Accessibility Services (Expo Hall E Reg Desk)",
     "name": "Accessibility Desk open",
     "start_time": "10:00 AM"
-  },
-  {
-    "end_time": "11:00 AM",
-    "id": "29587743",
-    "location": "Zombie Tag (Magnolia 3)",
-    "name": "Zombie Tag Sign up, Events, and Makeup",
-    "start_time": "10:00 AM"
-  },
-  {
-    "end_time": "10:00 PM",
-    "id": "29587969",
-    "location": "MAG Attendee Services/Info Desk (Potomac Coat Check)",
-    "name": "Info Desk Open",
-    "start_time": "10:00 AM"
-  },
-  {
-    "end_time": "11:00 AM",
-    "id": "29587741",
-    "location": "Tabletop Panels/Discussions (Riverview Ballroom 1)",
-    "name": "Donut Steel: the Original Character Panel",
-    "start_time": "10:00 AM"
-  },
-  {
-    "end_time": "12:00 PM",
-    "id": "29769137",
-    "location": "magFAST (Chesapeake 4,5,6)",
-    "name": "magFAST Preshow and Swadge Showcase",
-    "start_time": "11:00 AM"
   }
 ]
 ```
 
-### GET /sessions/<id>
+### GET /sessions/&lt;id&gt;
 
 Returns a single session object by ID:
 ```json
 {
-  "all_day": false, 
-  "description": "<p> Come hang out as we start the show! Maybe donate some money to Child's Play while you're here. </p>", 
-  "end_time": "2022-01-06T17:00:00+00:00", 
-  "id": "27441254", 
+  "all_day": false,
+  "description": "<p> Come hang out as we start the show! </p>",
+  "end_time": "2022-01-06T17:00:00+00:00",
+  "id": "27441254",
   "locations": [
     "3994633"
-  ], 
-  "name": "magFAST Opening Ceremonies", 
-  "start_time": "2022-01-06T16:30:00+00:00", 
+  ],
+  "name": "magFAST Opening Ceremonies",
+  "start_time": "2022-01-06T16:30:00+00:00",
   "tracks": [
     "530637"
   ]
@@ -158,32 +115,36 @@ Returns a single session object by ID:
 
 ### GET /locations
 
-Returns a list of locations, uses same sorting and filtering as sessions.
+Returns a list of locations, uses same sorting and filtering as sessions (default sort is `name`).
 
-### GET /locations/<id>
+### GET /locations/&lt;id&gt;
 
 Returns a single location by ID:
 ```json
 {
-    "id": "3985248", 
+    "id": "3985248",
     "name": "Annapolis 2-4 (Panels 4)"
 }
 ```
 
 ### GET /tracks
 
-Returns a list of tracks, uses same sorting and filtering as sessions.
+Returns a list of tracks, uses same sorting and filtering as locations.
 
-### GET /tracks/<id>
+### GET /tracks/&lt;id&gt;
 
 Returns a single track by ID:
 ```json
 {
-    "id": "530633", 
+    "id": "530633",
     "name": "Arcade"
 }
 ```
 
 ### GET /frab
 
-Returns the complete schedule in XML/Frab format
+Returns the complete schedule in XML/Frab format.
+
+### GET /frab/filtered
+
+Same format as `/frab`, but accepts all the `/sessions` arguments to filter which events are included (no result limit unless `limit` is passed).

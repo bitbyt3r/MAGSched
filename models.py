@@ -1,78 +1,31 @@
-from abc import ABC, abstractmethod
-from typing import List
 import datetime
-import config
-import json
+from typing import List
 
-db = None
-try:
-    import redis
-    db = redis.Redis(host=config.redis_host, port=config.redis_port, db=config.redis_db, decode_responses=True)
-except:
+
+class Track:
+    @classmethod
+    def extract(cls, data: dict):
+        return cls(
+            data.get("id"),
+            data.get("name")
+        )
+
+    def __init__(self, id: str, name: str):
+        self.id = id
+        self.name = name
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "name": self.name
+        }
+
+
+class Location(Track):
     pass
 
-class Collection(ABC):
-    @classmethod
-    def deserialize(cls, string: str):
-        return cls.extract(json.loads(string))
 
-    @abstractmethod
-    def serialize(self) -> str: pass
-
-    @classmethod
-    def get(cls):
-        for member in db.smembers(cls.__name__):
-            yield cls.deserialize(member)
-
-    def save(self):
-        db.sset(self.__class__.__name__, json.dumps(self.serialize()))
-
-    @classmethod
-    def full_update(cls, members):
-        with db.pipeline() as pipe:
-            pipe.delete(cls.__name__)
-            new_members = [json.dumps(x.serialize()) for x in members]
-            if new_members:
-                pipe.sadd(cls.__name__, *new_members)
-            pipe.execute()
-
-class Track(Collection):
-    @classmethod
-    def extract(cls, data: dict):
-        return cls(
-            data.get("id"),
-            data.get("name")
-        )
-
-    def __init__(self, id: str, name: str):
-        self.id = id
-        self.name = name
-
-    def serialize(self):
-        return {
-            "id": self.id,
-            "name": self.name
-        }
-
-class Location(Collection):
-    @classmethod
-    def extract(cls, data: dict):
-        return cls(
-            data.get("id"),
-            data.get("name")
-        )
-
-    def __init__(self, id: str, name: str):
-        self.id = id
-        self.name = name
-
-    def serialize(self):
-        return {
-            "id": self.id,
-            "name": self.name
-        }
-
-class Session(Collection):
+class Session:
     @classmethod
     def extract(cls, data: dict):
         return cls(
@@ -105,8 +58,9 @@ class Session(Collection):
         self.description = description
         self.locations = locations
         self.tracks = tracks
-        assert self.start_time.tzinfo is not None and self.start_time.tzinfo.utcoffset(self.start_time) is not None
-        assert self.end_time.tzinfo is not None and self.end_time.tzinfo.utcoffset(self.end_time) is not None
+        for label, value in [("start_time", start_time), ("end_time", end_time)]:
+            if value.tzinfo is None or value.utcoffset() is None:
+                raise ValueError(f"Session {id} has a naive {label}")
 
     def serialize(self):
         return {
@@ -119,4 +73,3 @@ class Session(Collection):
             "locations": self.locations,
             "tracks": self.tracks
         }
-
