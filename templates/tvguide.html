@@ -96,7 +96,6 @@
             position: absolute;
             inset: 0;
             pointer-events: none;
-            z-index: 60;
         }
 
         .hourline {
@@ -140,7 +139,8 @@
         }
 
         .locationname {
-            height: 84px;
+            box-sizing: border-box;
+            height: 94px;
             flex-shrink: 0;
             background: linear-gradient(to bottom, #3535c0, #1b1b96 40%, #101080);
             border: 2px solid;
@@ -159,9 +159,10 @@
         }
 
         .session {
+            box-sizing: border-box;
             flex-shrink: 0;
             position: absolute;
-            height: 84px;
+            height: 94px;
             background: linear-gradient(to bottom, #4646cf, #2828ad 40%, #16168a);
             border: 2px solid;
             border-color: #7f7fff #000040 #000040 #7f7fff;
@@ -222,6 +223,7 @@
             position: absolute;
             left: 0;
             right: 0;
+            top: -140px;
             height: 140px;
             background: linear-gradient(to bottom,
                     transparent,
@@ -245,8 +247,8 @@
         }
 
         @keyframes band {
-            from { top: -20%; }
-            to { top: 115%; }
+            from { transform: translateY(0); }
+            to { transform: translateY(120vh); }
         }
 
         @keyframes flicker {
@@ -286,11 +288,11 @@
         </div>
         <div id="timeline"></div>
         <div class="scheduletable">
+            <div id="gridlines"></div>
             <div id="slider">
                 <div id="locations"></div>
                 <div id="schedule"></div>
             </div>
-            <div id="gridlines"></div>
         </div>
     </div>
     <div class="crt">
@@ -382,24 +384,24 @@
         var animation_started = false;
 
         const keyframes = [
-            { transform: "translateY(0)" },
-            { transform: "translateY(-100px)" },
+            { transform: "translateY(0)", offset: 0 },
+            { transform: "translateY(0)", offset: 0.77, easing: "ease-in-out" },
+            { transform: "translateY(-100px)", offset: 1 },
         ];
 
         const settings = {
-            duration: 2000,
+            duration: 2600,
             iterations: 1,
-            easing: "steps(60)"
         };
 
-        function start_animation() {
-            let animation = slider.animate(keyframes, settings);
+        var animation = null;
 
-            function update_schedule(event) {
-                if (!schedule.children.length) {
-                    animation.play();
-                    return;
-                }
+        // Rotate the top row to the bottom and restart the slide. Idempotent: runs
+        // from the finish event and from the 1s clock tick as a watchdog, because a
+        // hidden/occluded tab never dispatches animation events.
+        function advance() {
+            if (!animation || animation.playState !== "finished") return;
+            if (schedule.children.length) {
                 let firstrow = schedule.children[0];
                 schedule.removeChild(firstrow);
                 schedule.append(firstrow);
@@ -407,9 +409,13 @@
                 let firstlocation = locations_el.children[0];
                 locations_el.removeChild(firstlocation);
                 locations_el.append(firstlocation);
-                animation.play();
             }
-            animation.addEventListener("finish", update_schedule);
+            animation.play();
+        }
+
+        function start_animation() {
+            animation = slider.animate(keyframes, settings);
+            animation.addEventListener("finish", advance);
         }
 
         async function load() {
@@ -497,11 +503,17 @@
             if (!animation_started) {
                 animation_started = true;
                 start_animation();
+            } else {
+                // Fresh rows: restart the scroll from the top of its cycle so the
+                // rebuild never lands mid-slide
+                animation.cancel();
+                animation.play();
             }
         }
         load();
 
         function updatetime() {
+            advance();
             let now = new Date();
             clock.innerText = now.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
             datestr.innerText = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase().replaceAll(',', '');
