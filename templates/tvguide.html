@@ -466,7 +466,10 @@
                 let x = axis_pos(new Date(s.start_time).getTime() / 1000);
                 return { name: s.name, x: x, w: axis_pos(new Date(s.end_time).getTime() / 1000) - x };
             }).filter((chip) =>
-                chip.w > 50 && chip.x < viewport_right && chip.x + chip.w > viewport_left);
+                chip.w > 50 && chip.x < viewport_right
+                // A block straddling the room-name edge must have at least half an
+                // hour still visible, or it is hidden
+                && chip.x + chip.w > viewport_left + (chip.x < viewport_left ? 200 : 0));
             if (!chips.length) return null;
             // Concurrent sessions stack into extra lanes instead of overlapping
             let lanes = [];
@@ -490,10 +493,13 @@
                     chip_div.style.left = Math.round(chip.x) + 'px';
                     chip_div.style.width = Math.round(chip.w) + 'px';
                     chip_div.style.top = ((chip.lane - base) * 100 + 3) + 'px';
-                    // Wrap the title at the screen edge, not the (possibly off-screen) chip edge
+                    // The title starts at the visible edge (never behind the room
+                    // names) and wraps within the visible span
+                    let text_left = Math.max(chip.x, viewport_left);
                     let text = document.createElement("div");
                     text.innerText = chip.name;
-                    text.style.maxWidth = Math.max(50, viewport_right - chip.x - 20) + 'px';
+                    text.style.marginLeft = Math.round(text_left - chip.x) + 'px';
+                    text.style.maxWidth = Math.max(50, viewport_right - text_left - 20) + 'px';
                     chip_div.append(text);
                     row.append(chip_div);
                 });
