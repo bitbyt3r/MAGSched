@@ -73,6 +73,7 @@
         .time {
             position: absolute;
             flex-shrink: 0;
+            white-space: nowrap;
             height: 56px;
             color: #ffe14d;
             line-height: 56px;
@@ -94,8 +95,19 @@
 
         #gridlines {
             position: absolute;
-            inset: 0;
+            left: 260px;
+            top: 0;
+            bottom: 0;
+            width: 0;
             pointer-events: none;
+        }
+
+        #timetrack {
+            position: absolute;
+            left: 260px;
+            top: 0;
+            bottom: 0;
+            width: 0;
         }
 
         .hourline {
@@ -116,11 +128,12 @@
         }
 
         #locations {
-            width: 200px;
+            width: 260px;
             flex-direction: column;
             display: flex;
             flex-shrink: 0;
             z-index: 50;
+            background-color: #0b0b74;
         }
 
         #schedule {
@@ -285,7 +298,9 @@
                 <div class="ad">View full schedule at {{ schedule_host }}</div>
             </div>
         </div>
-        <div id="timeline"></div>
+        <div id="timeline">
+            <div id="timetrack"></div>
+        </div>
         <div class="scheduletable">
             <div id="gridlines"></div>
             <div id="slider">
@@ -322,40 +337,64 @@
         let schedule = document.getElementById("schedule");
         let gridlines = document.getElementById("gridlines");
         let locations_el = document.getElementById("locations");
-        let timeline = document.getElementById("timeline");
+        let timetrack = document.getElementById("timetrack");
+        let scheduletable = document.querySelector(".scheduletable");
         let slider = document.getElementById("slider");
         let clock = document.getElementById("clock");
         let datestr = document.getElementById("datestr");
-        var locations = [];
-        var locations_lookup = {};
-        var visible_locations = [];
-        var sessions = [];
-        var sessions_by_location = {};
+
         let hour_width = 400;
         const GAP_W = 24;
+        const WINDOW_FORWARD = 28800;
 
-        // Compressed time axis: only hours in which at least one session starts
-        // exist on screen; skipped stretches collapse into a GAP_W-wide break.
-        function build_axis(now) {
-            let keep = new Set([Math.floor(now / 3600)]);
-            sessions.forEach((s) => keep.add(Math.floor(new Date(s.start_time).getTime() / 1000 / 3600)));
-            let segs = [];
-            let gaps = [];
-            let x = 0;
-            let prev = null;
-            for (const h of [...keep].sort((a, b) => a - b)) {
-                if (prev !== null && h > prev + 1) {
-                    gaps.push(x);
-                    x += GAP_W;
-                }
-                segs.push({ h: h, x: x });
-                x += hour_width;
-                prev = h;
+        var locations_lookup = {};
+        var sessions = [];
+        var started = false;
+        var cursor = { name: "", id: "" };
+        var animation = null;
+        var animation_hold = 2000;
+        var animation_duration = 2600;
+
+        // ---- Persistent compressed time axis ----
+        // Hours enter on the right, evaluated once against the schedule as it is
+        // at that moment, and keep their coordinates forever. Rows on screen are
+        // never repositioned; the whole grid crawls left via a transform instead.
+        var axis = { segs: [], last_kept: null, evaluated_until: null, x: 0 };
+
+        function extend_axis(target_hour) {
+            if (axis.evaluated_until === null) {
+                axis.evaluated_until = Math.floor((Date.now() / 1000 - 5400) / 3600) - 1;
             }
-            return { segs: segs, gaps: gaps };
+            while (axis.evaluated_until < target_hour) {
+                let h = ++axis.evaluated_until;
+                if (!sessions.some((s) => Math.floor(new Date(s.start_time).getTime() / 1000 / 3600) === h)) {
+                    continue;
+                }
+                if (axis.last_kept !== null && h > axis.last_kept + 1) {
+                    add_mark("gapline", axis.x);
+                    axis.x += GAP_W;
+                }
+                axis.segs.push({ h: h, x: axis.x });
+                add_mark("hourline", axis.x);
+                let label = document.createElement("div");
+                label.classList.add("time");
+                label.innerText = new Date(h * 3600000).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
+                label.style.left = axis.x + 'px';
+                timetrack.append(label);
+                axis.x += hour_width;
+                axis.last_kept = h;
+            }
         }
 
-        function axis_pos(axis, t) {
+        function add_mark(cls, x) {
+            let line = document.createElement("div");
+            line.classList.add(cls);
+            line.style.left = x + 'px';
+            gridlines.append(line);
+        }
+
+        function axis_pos(t) {
+            if (!axis.segs.length) return 0;
             let h = Math.floor(t / 3600);
             if (h < axis.segs[0].h) {
                 return axis.segs[0].x + (t - axis.segs[0].h * 3600) / 3600 * hour_width;
@@ -371,12 +410,134 @@
             return seg.x + hour_width;  // t is inside a skipped stretch: clamp to its edge
         }
 
-        var animation = null;
-        var animation_hold = 2000;
-        var animation_duration = 2600;
+        function prune_axis() {
+            let cutoff = axis_pos(Date.now() / 1000) - 2000;
+            while (axis.segs.length > 1 && axis.segs[0].x + hour_width < cutoff) {
+                axis.segs.shift();
+            }
+            for (const el of [...timetrack.children, ...gridlines.children]) {
+                if (parseFloat(el.style.left) + hour_width < cutoff) el.remove();
+            }
+        }
 
-        // Slide up by the height of whatever row is currently on top, holding for
-        // 2s per displayed lane so taller rooms get proportionally more read time
+        // ---- Virtualized rows ----
+        function display_name(id) {
+            return locations_lookup[id].name.split(' (')[0];
+        }
+
+        function ordered_locations() {
+            let ids = new Set();
+            sessions.forEach((s) => {
+                if (s.locations.length && locations_lookup[s.locations[0]]) ids.add(s.locations[0]);
+            });
+            return [...ids].sort((a, b) =>
+                display_name(a).localeCompare(display_name(b)) || a.localeCompare(b));
+        }
+
+        function next_location() {
+            let order = ordered_locations();
+            if (!order.length) return null;
+            let idx = order.findIndex((id) =>
+                (display_name(id).localeCompare(cursor.name) || id.localeCompare(cursor.id)) > 0);
+            return order[idx === -1 ? 0 : idx];
+        }
+
+        const MAX_LANES = 3;
+
+        // Build one room's rows from the latest schedule (rooms with more than
+        // MAX_LANES concurrent sessions split into separate chunks that scroll
+        // independently). Once appended they are never touched again.
+        function build_row(location) {
+            let now = Date.now() / 1000;
+            extend_axis(Math.floor((now + WINDOW_FORWARD) / 3600));
+            let viewport_right = axis_pos(now) + window.innerWidth - 260;
+            let chips = sessions.filter((s) => s.locations[0] === location).map((s) => {
+                let x = axis_pos(new Date(s.start_time).getTime() / 1000);
+                return { name: s.name, x: x, w: axis_pos(new Date(s.end_time).getTime() / 1000) - x };
+            }).filter((chip) => chip.w > 50 && chip.x + chip.w > axis_pos(now) - 100);
+            if (!chips.length) return null;
+            // Concurrent sessions stack into extra lanes instead of overlapping
+            let lanes = [];
+            chips.forEach((chip) => {
+                chip.lane = lanes.findIndex((right) => chip.x >= right);
+                if (chip.lane === -1) {
+                    chip.lane = lanes.length;
+                    lanes.push(0);
+                }
+                lanes[chip.lane] = chip.x + chip.w;
+            });
+            let built = [];
+            for (let base = 0; base < lanes.length; base += MAX_LANES) {
+                let chunk_lanes = Math.min(MAX_LANES, lanes.length - base);
+                let row = document.createElement("div");
+                row.classList.add("schedulerow");
+                row.style.height = chunk_lanes * 100 + 'px';
+                chips.filter((chip) => chip.lane >= base && chip.lane < base + MAX_LANES).forEach((chip) => {
+                    let chip_div = document.createElement("div");
+                    chip_div.classList.add("session");
+                    chip_div.style.left = Math.round(chip.x) + 'px';
+                    chip_div.style.width = Math.round(chip.w) + 'px';
+                    chip_div.style.top = ((chip.lane - base) * 100 + 3) + 'px';
+                    // Wrap the title at the screen edge, not the (possibly off-screen) chip edge
+                    let text = document.createElement("div");
+                    text.innerText = chip.name;
+                    text.style.maxWidth = Math.max(50, viewport_right - chip.x - 20) + 'px';
+                    chip_div.append(text);
+                    row.append(chip_div);
+                });
+                let name_div = document.createElement("div");
+                name_div.classList.add("locationname");
+                name_div.style.height = (chunk_lanes * 100 - 6) + 'px';
+                name_div.innerText = display_name(location);
+                built.push({ row: row, name_div: name_div });
+            }
+            return built;
+        }
+
+        function append_spacer() {
+            for (const parent of [schedule, locations_el]) {
+                let spacer = document.createElement("div");
+                spacer.style.height = '100px';
+                spacer.style.flexShrink = '0';
+                parent.append(spacer);
+            }
+        }
+
+        // Top up the bottom of the carousel until it covers the viewport plus one
+        // slide of buffer, consulting the latest schedule for each new row.
+        function fill_rows() {
+            let target = scheduletable.offsetHeight + 600;
+            let misses = 0;
+            let content = [...schedule.children].reduce((total, row) => total + row.offsetHeight, 0);
+            while (content < target) {
+                let location = next_location();
+                if (location === null) {
+                    append_spacer();
+                    content += 100;
+                    continue;
+                }
+                cursor = { name: display_name(location), id: location };
+                let built = build_row(location);
+                if (!built) {
+                    if (++misses >= ordered_locations().length) {
+                        append_spacer();
+                        content += 100;
+                        misses = 0;
+                    }
+                    continue;
+                }
+                misses = 0;
+                built.forEach((chunk) => {
+                    schedule.append(chunk.row);
+                    locations_el.append(chunk.name_div);
+                    content += chunk.row.offsetHeight;
+                });
+            }
+        }
+
+        // ---- Scroll cycle ----
+        // Slide up by the height of the top row, holding 2s per displayed lane;
+        // then drop the top row and append fresh rows at the bottom.
         function make_animation() {
             if (animation) {
                 animation.cancel();
@@ -393,154 +554,51 @@
             animation.addEventListener("finish", advance);
         }
 
-        // Rotate the top row to the bottom and restart the slide. Idempotent: runs
-        // from the finish event and from the 1s clock tick as a watchdog, because a
-        // hidden/occluded tab never dispatches animation events.
+        // Idempotent: runs from the finish event and from the 1s clock tick as a
+        // watchdog, because a hidden/occluded tab never dispatches animation events.
         function advance() {
             if (!animation || animation.playState !== "finished") return;
             if (schedule.children.length) {
-                let firstrow = schedule.children[0];
-                schedule.removeChild(firstrow);
-                schedule.append(firstrow);
-
-                let firstlocation = locations_el.children[0];
-                locations_el.removeChild(firstlocation);
-                locations_el.append(firstlocation);
+                schedule.children[0].remove();
             }
+            if (locations_el.children.length) {
+                locations_el.children[0].remove();
+            }
+            prune_axis();
+            fill_rows();
             make_animation();
         }
 
+        // The grid never re-renders as time passes; it crawls left as one piece.
+        function crawl() {
+            let transform = 'translateX(' + -axis_pos(Date.now() / 1000) + 'px)';
+            schedule.style.transform = transform;
+            gridlines.style.transform = transform;
+            timetrack.style.transform = transform;
+        }
+
+        // Background data refresh: no DOM changes here at all. Rows already on
+        // screen keep showing the schedule as it was when they were built.
         async function load() {
+            let fetched_locations = await fetch("/locations?limit=-1").then(res => res.json());
+            let fetched_sessions = await fetch("/sessions?limit=-1&time_range_start=-5400&time_range_end=+28800").then(res => res.json());
             locations_lookup = {};
-            locations = await fetch("/locations?limit=-1").then(res => res.json());
-            locations.forEach((location) => {
+            fetched_locations.forEach((location) => {
                 locations_lookup[location.id] = location;
-            })
-            sessions = await fetch("/sessions?limit=-1&time_range_start=-5400&time_range_end=+28800").then(res => res.json());
-            // Apply the new data in the background: never interrupt a slide in progress
-            if (animation && animation.playState === "running" && animation.currentTime > animation_hold - 100) {
-                setTimeout(render, animation_duration - animation.currentTime + 150);
-            } else {
-                render();
-            }
-        }
-
-        function render() {
-            // Keep cycling from wherever the rotation currently is
-            let top_location = schedule.children.length ? schedule.children[0].dataset.location : null;
-            let top_name = locations_el.children.length ? locations_el.children[0].innerText : null;
-            sessions_by_location = {};
-            visible_locations = [];
-            let now = new Date().getTime() / 1000;
-            let axis = build_axis(now);
-            let origin = axis_pos(axis, now);
-            sessions.forEach((session) => {
-                let session_start_time = new Date(session.start_time).getTime() / 1000;
-                let session_end_time = new Date(session.end_time).getTime() / 1000;
-                session.position = axis_pos(axis, session_start_time) - origin;
-                session.width = axis_pos(axis, session_end_time) - axis_pos(axis, session_start_time);
-
-                let location = session.locations[0];
-                if (visible_locations.indexOf(location) === -1) {
-                    visible_locations.push(location);
-                    sessions_by_location[location] = [];
-                }
-                sessions_by_location[location].push(session);
-            })
-            timeline.replaceChildren();
-            let new_rows = [];
-            let new_names = [];
-
-            let ordered = Object.keys(sessions_by_location).sort((a, b) =>
-                locations_lookup[a].name.localeCompare(locations_lookup[b].name));
-            for (const location of ordered) {
-                let sessions_in_location = sessions_by_location[location];
-                let renderable = sessions_in_location.filter((session) => {
-                    if (session.position < 0) {
-                        session.width = session.width + session.position;
-                        session.position = 0;
-                    }
-                    return session.width > 50;
-                });
-                if (!renderable.length) continue;  // nothing to show for this room
-                // Concurrent sessions stack into extra lanes instead of overlapping
-                let lanes = [];
-                renderable.forEach((session) => {
-                    session.lane = lanes.findIndex((right) => session.position >= right);
-                    if (session.lane === -1) {
-                        session.lane = lanes.length;
-                        lanes.push(0);
-                    }
-                    lanes[session.lane] = session.position + session.width;
-                });
-                let div = document.createElement("div");
-                div.classList.add("schedulerow");
-                div.dataset.location = location;
-                div.style.height = lanes.length * 100 + 'px';
-                let location_div = document.createElement("div");
-                location_div.classList.add("locationname");
-                location_div.style.height = (lanes.length * 100 - 6) + 'px';
-                location_div.innerText = locations_lookup[location].name.split(' (')[0];
-                new_names.push(location_div);
-                renderable.forEach((session) => {
-                    let session_div = document.createElement("div");
-                    session_div.classList.add("session");
-                    session_div.style.left = Math.round(session.position) + 'px';
-                    session_div.style.width = Math.round(session.width) + 'px';
-                    session_div.style.top = (session.lane * 100 + 3) + 'px';
-                    // Wrap the title at the screen edge, not the (possibly off-screen) chip edge
-                    let text_div = document.createElement("div");
-                    text_div.innerText = session.name;
-                    text_div.style.maxWidth = Math.max(50, window.innerWidth - 200 - session.position - 20) + 'px';
-                    session_div.append(text_div);
-                    div.append(session_div);
-                })
-                new_rows.push(div);
-            }
-
-            // Re-apply the previous rotation so reloads are invisible; if that room
-            // vanished from the window, resume from the next room after it
-            let ids = new_rows.map((row) => row.dataset.location);
-            let idx = top_location === null ? 0 : ids.indexOf(top_location);
-            if (idx === -1) {
-                idx = new_names.findIndex((name_div) => name_div.innerText.localeCompare(top_name) > 0);
-                if (idx === -1) idx = 0;
-            }
-            schedule.replaceChildren(...new_rows.slice(idx), ...new_rows.slice(0, idx));
-            locations_el.replaceChildren(...new_names.slice(idx), ...new_names.slice(0, idx));
-
-            gridlines.replaceChildren();
-            axis.segs.forEach((seg) => {
-                let rel = seg.x - origin;
-                if (rel <= 0) return;
-                let div = document.createElement("div");
-                div.classList.add("time");
-                div.innerText = new Date(seg.h * 3600000).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
-                div.style.width = hour_width + "px";
-                div.style.left = rel + 200 + "px";
-                timeline.append(div);
-                let line = document.createElement("div");
-                line.classList.add("hourline");
-                line.style.left = rel + 200 + "px";
-                gridlines.append(line);
             });
-            axis.gaps.forEach((gapX) => {
-                let rel = gapX - origin;
-                if (rel <= 0) return;
-                let line = document.createElement("div");
-                line.classList.add("gapline");
-                line.style.left = rel + 200 + "px";
-                gridlines.append(line);
-            });
-
-            // (Re)start the scroll cycle sized to the new first row, so a data
-            // rebuild never lands mid-slide
-            make_animation();
+            sessions = fetched_sessions;
+            if (!started) {
+                started = true;
+                crawl();
+                fill_rows();
+                make_animation();
+            }
         }
         load();
 
         function updatetime() {
             advance();
+            crawl();
             let now = new Date();
             clock.innerText = now.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
             datestr.innerText = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase().replaceAll(',', '');
