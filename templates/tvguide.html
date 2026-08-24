@@ -1,62 +1,92 @@
 <html>
 
 <head>
+    <meta name="color-scheme" content="dark">
+    <title>MAGFest TV Guide</title>
     <style>
         body {
-            background-color: rgba(0, 0, 0, 0);
+            background-color: #04043a;
             height: 100%;
             margin: 0;
             display: flex;
             flex-direction: column;
             overflow: clip;
+            font-family: "Arial Rounded MT Bold", "Helvetica Rounded", "Trebuchet MS", Verdana, sans-serif;
+            font-weight: bold;
+            /* Composite-video color fringing on text; cleared by ?scanlines=off */
+            --fringe: -1px 0 0 rgba(255, 70, 70, 0.4), 1px 0 0 rgba(80, 230, 255, 0.4);
+        }
+
+        .tv {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            filter: saturate(1.25) contrast(1.06) blur(0.3px);
+            animation: flicker 0.12s infinite;
         }
 
         .toprow {
             align-items: center;
             background-image: url("/static/background.png");
+            background-size: cover;
             display: flex;
             flex-direction: row;
+            flex-shrink: 0;
         }
 
         .logo {
-            height: 400px;
+            height: 300px;
         }
 
-        .advertisement {
-            width: 500px;
-            text-align: center;
-            color: yellow;
-            font-size: 25px;
+        .infopanel {
             flex-grow: 1;
+            text-align: center;
+            text-shadow: var(--fringe), 3px 3px 0 rgba(0, 0, 0, 0.7);
+        }
+
+        .clock {
+            color: #ffe14d;
+            font-size: 84px;
+            letter-spacing: 4px;
+        }
+
+        .datestr {
+            color: #ffffff;
+            font-size: 40px;
+            letter-spacing: 6px;
+        }
+
+        .ad {
+            color: #ffe14d;
+            font-size: 26px;
+            padding-top: 12px;
         }
 
         #timeline {
-            background-color: darkblue;
+            background: linear-gradient(to bottom, #4b4bd6, #20208c 45%, #14146b);
+            border-top: 3px solid #7f7fff;
+            border-bottom: 3px solid #000030;
             overflow: clip;
-            height: 50px;
+            height: 56px;
             flex-shrink: 0;
+            position: relative;
         }
 
         .time {
             position: absolute;
             flex-shrink: 0;
-            height: 50px;
-            color: white;
-            line-height: 50px;
-            font-size: 35px;
-        }
-
-        #currenttime {
-            position: absolute;
-            flex-shrink: 0;
-            height: 50px;
-            color: white;
-            line-height: 50px;
-            font-size: 40px;
+            height: 56px;
+            color: #ffe14d;
+            line-height: 56px;
+            font-size: 34px;
+            letter-spacing: 2px;
+            text-shadow: var(--fringe), 2px 2px 0 rgba(0, 0, 0, 0.7);
+            border-left: 3px solid #7f7fff;
+            padding-left: 12px;
         }
 
         .scheduletable {
-            background-color: blue;
+            background-color: #0b0b74;
             overflow: clip;
             flex-grow: 1;
             flex-direction: row;
@@ -78,9 +108,9 @@
             width: 100%;
             position: relative;
             background:
-            repeating-linear-gradient(90deg,
-            #0000 0 196px,
-            black 0 200px);
+                repeating-linear-gradient(90deg,
+                    #0000 0 197px,
+                    #000048 0 200px);
             background-position: 3px 0px;
         }
 
@@ -92,25 +122,44 @@
         }
 
         .locationname {
-            height: 88px;
+            height: 84px;
             flex-shrink: 0;
-            background-color: darkred;
-            border: 2px solid black;
-            color: white;
+            background: linear-gradient(to bottom, #3535c0, #1b1b96 40%, #101080);
+            border: 2px solid;
+            border-color: #6f6fe8 #000040 #000040 #6f6fe8;
+            border-radius: 8px;
+            margin: 3px;
+            color: #ffe14d;
             font-size: 24px;
+            line-height: 1.1;
+            text-transform: uppercase;
             padding: 4px;
+            overflow: clip;
+            display: flex;
+            align-items: center;
+            text-shadow: var(--fringe), 2px 2px 0 rgba(0, 0, 0, 0.7);
         }
 
         .session {
             flex-shrink: 0;
             position: absolute;
-            height: 88px;
-            background-color: darkblue;
-            border: 2px solid grey;
+            height: 84px;
+            background: linear-gradient(to bottom, #4646cf, #2828ad 40%, #16168a);
+            border: 2px solid;
+            border-color: #7f7fff #000040 #000040 #7f7fff;
+            border-radius: 8px;
+            margin-top: 3px;
             overflow: clip;
             color: white;
-            font-size: 24px;
-            padding: 4px;
+            font-size: 26px;
+            line-height: 1.15;
+            padding: 6px 10px;
+            text-shadow: var(--fringe), 2px 2px 0 rgba(0, 0, 0, 0.7);
+        }
+
+        .session .stime {
+            color: #ffe14d;
+            padding-right: 10px;
         }
 
         #slider {
@@ -121,32 +170,127 @@
             flex-grow: 1;
         }
 
+        /* ---- CRT artifact overlays (disabled by ?scanlines=off) ---- */
+        .crt {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .crt-scanlines {
+            position: absolute;
+            inset: 0;
+            /* 480i interlace lines plus a faint RGB phosphor mask */
+            background-image:
+                repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, 0.30) 0px, rgba(0, 0, 0, 0.30) 1px,
+                    transparent 1px, transparent 3px),
+                repeating-linear-gradient(90deg,
+                    rgba(255, 0, 0, 0.045) 0px, rgba(0, 255, 0, 0.03) 1px,
+                    rgba(0, 0, 255, 0.045) 2px, transparent 3px);
+        }
+
+        .crt-grain {
+            position: absolute;
+            inset: -100px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+            opacity: 0.055;
+            animation: grain 0.5s steps(5) infinite;
+        }
+
+        .crt-band {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 140px;
+            background: linear-gradient(to bottom,
+                    transparent,
+                    rgba(255, 255, 255, 0.05) 40%,
+                    rgba(0, 0, 0, 0.14) 60%,
+                    transparent);
+            animation: band 9s linear infinite;
+        }
+
+        .crt-vignette {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, 0.5) 100%);
+            box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.65);
+            border-radius: 28px;
+        }
+
+        @keyframes band {
+            from { top: -20%; }
+            to { top: 115%; }
+        }
+
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.982; }
+        }
+
+        @keyframes grain {
+            0% { transform: translate(0, 0); }
+            20% { transform: translate(-40px, 25px); }
+            40% { transform: translate(30px, -60px); }
+            60% { transform: translate(-60px, -20px); }
+            80% { transform: translate(50px, 55px); }
+            100% { transform: translate(0, 0); }
+        }
+
+        body.no-fx .crt { display: none; }
+
+        body.no-fx {
+            --fringe: 0 0 transparent;
+        }
+
+        body.no-fx .tv {
+            animation: none;
+            filter: none;
+        }
     </style>
 </head>
 
 <body>
-    <div class="toprow">
-        <div class="stream">
-            <img src="/static/logo.png" class="logo">
+    <div class="tv">
+        <div class="toprow">
+            <div class="stream">
+                <img src="/static/logo.png" class="logo">
+            </div>
+            <div class="infopanel">
+                <div class="clock" id="clock"></div>
+                <div class="datestr" id="datestr"></div>
+                <div class="ad">View full schedule at {{ schedule_host }}</div>
+            </div>
         </div>
-        <div class="advertisement">
-            <h1>View full schedule at<br>{{ schedule_host }}</h1>
+        <div id="timeline"></div>
+        <div class="scheduletable">
+            <div id="slider">
+                <div id="locations"></div>
+                <div id="schedule"></div>
+            </div>
         </div>
     </div>
-    <div id="timeline"></div>
-    <div class="scheduletable">
-        <div id="slider">
-            <div id="locations"></div>
-            <div id="schedule"></div>
-        </div>
+    <div class="crt">
+        <div class="crt-scanlines"></div>
+        <div class="crt-grain"></div>
+        <div class="crt-band"></div>
+        <div class="crt-vignette"></div>
     </div>
 
     <script type="text/javascript">
+        const params = new URLSearchParams(location.search);
+        if (["off", "false", "0", "no"].includes((params.get("scanlines") || "").toLowerCase())) {
+            document.body.classList.add("no-fx");
+        }
+
         let schedule = document.getElementById("schedule");
         let locations_el = document.getElementById("locations");
         let timeline = document.getElementById("timeline");
         let slider = document.getElementById("slider");
-        let currenttime = document.getElementById("currenttime");
+        let clock = document.getElementById("clock");
+        let datestr = document.getElementById("datestr");
         var locations = [];
         var locations_lookup = {};
         var visible_locations = [];
@@ -230,7 +374,7 @@
                 locations_el.append(location_div);
                 sessions_in_location.forEach((session) => {
                     let session_start_time = new Date(session.start_time).getTime() / 1000;
-                    session.position = Math.round((session_start_time - now) / 900)/4 * hour_width;
+                    session.position = Math.round((session_start_time - now) / 900) / 4 * hour_width;
                     if (session.position < 0) {
                         session.width = session.width + session.position;
                         session.position = 0;
@@ -238,8 +382,10 @@
                     if (session.width > 50) {
                         let session_div = document.createElement("div");
                         session_div.classList.add("session");
-                        let session_time = new Date(session.start_time).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
-                        session_div.innerText = session.name +" "+ session_time;
+                        let time_span = document.createElement("span");
+                        time_span.classList.add("stime");
+                        time_span.innerText = new Date(session.start_time).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
+                        session_div.append(time_span, document.createTextNode(session.name));
                         session_div.style.left = Math.round(session.position) + 'px';
                         session_div.style.width = Math.round(session.width) + 'px';
                         div.append(session_div);
@@ -247,13 +393,9 @@
                 })
                 schedule.append(div);
             }
-            
+
             var offset = 0;
-            currenttime = document.createElement("div");
-            currenttime.id = "currenttime";
-            currenttime.innerText = new Date().toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
-            timeline.append(currenttime);
-            for (let time=start_time; time <= end_time; time += 3600) {
+            for (let time = start_time; time <= end_time; time += 3600) {
                 let div = document.createElement("div");
                 div.classList.add("time");
                 let date = new Date(time * 1000);
@@ -277,8 +419,11 @@
         load();
 
         function updatetime() {
-            currenttime.innerText = new Date().toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
+            let now = new Date();
+            clock.innerText = now.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true });
+            datestr.innerText = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase().replaceAll(',', '');
         }
+        updatetime();
         setInterval(load, 60000);
         setInterval(updatetime, 1000);
     </script>
