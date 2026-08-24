@@ -88,6 +88,7 @@
             background-color: #0b0b74;
             overflow: clip;
             flex-grow: 1;
+            min-height: 0;
             flex-direction: row;
             display: flex;
             position: relative;
@@ -350,7 +351,7 @@
         var locations_lookup = {};
         var sessions = [];
         var started = false;
-        var cursor = { name: "", id: "" };
+        var cursor = "";
         var animation = null;
         var animation_hold = 2000;
         var animation_duration = 2600;
@@ -421,24 +422,27 @@
         }
 
         // ---- Virtualized rows ----
+        // Rooms are grouped by display name: locations like "Arcade (Stage)" and
+        // "Arcade (Hall)" merge into one "ARCADE" block whose content lines are
+        // packed together before chunking.
         function display_name(id) {
             return locations_lookup[id].name.split(' (')[0];
         }
 
-        function ordered_locations() {
-            let ids = new Set();
+        function ordered_rooms() {
+            let names = new Set();
             sessions.forEach((s) => {
-                if (s.locations.length && locations_lookup[s.locations[0]]) ids.add(s.locations[0]);
+                if (s.locations.length && locations_lookup[s.locations[0]]) {
+                    names.add(display_name(s.locations[0]));
+                }
             });
-            return [...ids].sort((a, b) =>
-                display_name(a).localeCompare(display_name(b)) || a.localeCompare(b));
+            return [...names].sort((a, b) => a.localeCompare(b));
         }
 
-        function next_location() {
-            let order = ordered_locations();
+        function next_room() {
+            let order = ordered_rooms();
             if (!order.length) return null;
-            let idx = order.findIndex((id) =>
-                (display_name(id).localeCompare(cursor.name) || id.localeCompare(cursor.id)) > 0);
+            let idx = order.findIndex((name) => name.localeCompare(cursor) > 0);
             return order[idx === -1 ? 0 : idx];
         }
 
@@ -447,14 +451,22 @@
         // Build one room's rows from the latest schedule (rooms with more than
         // MAX_LANES concurrent sessions split into separate chunks that scroll
         // independently). Once appended they are never touched again.
-        function build_row(location) {
+        function build_row(room) {
             let now = Date.now() / 1000;
             extend_axis(Math.floor((now + WINDOW_FORWARD) / 3600));
-            let viewport_right = axis_pos(now) + window.innerWidth - 260;
-            let chips = sessions.filter((s) => s.locations[0] === location).map((s) => {
+            let viewport_left = axis_pos(now);
+            let viewport_right = viewport_left + window.innerWidth - 260;
+            // Only chips that will actually be on screen count: a room whose
+            // sessions are all in the past or beyond the right edge is skipped
+            // rather than shown as an empty row
+            let chips = sessions.filter((s) =>
+                s.locations.length && locations_lookup[s.locations[0]]
+                && display_name(s.locations[0]) === room
+            ).map((s) => {
                 let x = axis_pos(new Date(s.start_time).getTime() / 1000);
                 return { name: s.name, x: x, w: axis_pos(new Date(s.end_time).getTime() / 1000) - x };
-            }).filter((chip) => chip.w > 50 && chip.x + chip.w > axis_pos(now) - 100);
+            }).filter((chip) =>
+                chip.w > 50 && chip.x < viewport_right && chip.x + chip.w > viewport_left);
             if (!chips.length) return null;
             // Concurrent sessions stack into extra lanes instead of overlapping
             let lanes = [];
@@ -488,7 +500,7 @@
                 let name_div = document.createElement("div");
                 name_div.classList.add("locationname");
                 name_div.style.height = (chunk_lanes * 100 - 6) + 'px';
-                name_div.innerText = display_name(location);
+                name_div.innerText = room;
                 built.push({ row: row, name_div: name_div });
             }
             return built;
@@ -510,16 +522,16 @@
             let misses = 0;
             let content = [...schedule.children].reduce((total, row) => total + row.offsetHeight, 0);
             while (content < target) {
-                let location = next_location();
-                if (location === null) {
+                let room = next_room();
+                if (room === null) {
                     append_spacer();
                     content += 100;
                     continue;
                 }
-                cursor = { name: display_name(location), id: location };
-                let built = build_row(location);
+                cursor = room;
+                let built = build_row(room);
                 if (!built) {
-                    if (++misses >= ordered_locations().length) {
+                    if (++misses >= ordered_rooms().length) {
                         append_spacer();
                         content += 100;
                         misses = 0;
