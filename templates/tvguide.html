@@ -132,7 +132,7 @@
         }
 
         .schedulerow {
-            height: 100px;
+            position: relative;
             flex-direction: row;
             display: flex;
             flex-shrink: 0;
@@ -163,17 +163,21 @@
             flex-shrink: 0;
             position: absolute;
             height: 94px;
+            top: 3px;
             background: linear-gradient(to bottom, #4646cf, #2828ad 40%, #16168a);
             border: 2px solid;
             border-color: #7f7fff #000040 #000040 #7f7fff;
             border-radius: 8px;
-            margin-top: 3px;
             overflow: clip;
             color: white;
             font-size: 26px;
             line-height: 1.15;
             padding: 6px 10px;
             text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
+        }
+
+        .session div {
+            overflow: clip;
         }
 
         #slider {
@@ -366,20 +370,23 @@
             }
             return seg.x + hour_width;  // t is inside a skipped stretch: clamp to its edge
         }
-        var animation_started = false;
-
-        const keyframes = [
-            { transform: "translateY(0)", offset: 0 },
-            { transform: "translateY(0)", offset: 0.77, easing: "ease-in-out" },
-            { transform: "translateY(-100px)", offset: 1 },
-        ];
-
-        const settings = {
-            duration: 2600,
-            iterations: 1,
-        };
 
         var animation = null;
+
+        // Slide up by the height of whatever row is currently on top (rows are
+        // taller when concurrent sessions stack into extra lanes)
+        function make_animation() {
+            if (animation) {
+                animation.cancel();
+            }
+            let distance = schedule.children.length ? schedule.children[0].offsetHeight : 100;
+            animation = slider.animate([
+                { transform: "translateY(0)", offset: 0 },
+                { transform: "translateY(0)", offset: 0.77, easing: "ease-in-out" },
+                { transform: "translateY(-" + distance + "px)", offset: 1 },
+            ], { duration: 2600, iterations: 1 });
+            animation.addEventListener("finish", advance);
+        }
 
         // Rotate the top row to the bottom and restart the slide. Idempotent: runs
         // from the finish event and from the 1s clock tick as a watchdog, because a
@@ -395,12 +402,7 @@
                 locations_el.removeChild(firstlocation);
                 locations_el.append(firstlocation);
             }
-            animation.play();
-        }
-
-        function start_animation() {
-            animation = slider.animate(keyframes, settings);
-            animation.addEventListener("finish", advance);
+            make_animation();
         }
 
         async function load() {
@@ -441,18 +443,35 @@
                     return session.width > 50;
                 });
                 if (!renderable.length) continue;  // nothing to show for this room
+                // Concurrent sessions stack into extra lanes instead of overlapping
+                let lanes = [];
+                renderable.forEach((session) => {
+                    session.lane = lanes.findIndex((right) => session.position >= right);
+                    if (session.lane === -1) {
+                        session.lane = lanes.length;
+                        lanes.push(0);
+                    }
+                    lanes[session.lane] = session.position + session.width;
+                });
                 let div = document.createElement("div");
                 div.classList.add("schedulerow");
+                div.style.height = lanes.length * 100 + 'px';
                 let location_div = document.createElement("div");
                 location_div.classList.add("locationname");
+                location_div.style.height = (lanes.length * 100 - 6) + 'px';
                 location_div.innerText = locations_lookup[location].name.split(' (')[0];
                 locations_el.append(location_div);
                 renderable.forEach((session) => {
                     let session_div = document.createElement("div");
                     session_div.classList.add("session");
-                    session_div.innerText = session.name;
                     session_div.style.left = Math.round(session.position) + 'px';
                     session_div.style.width = Math.round(session.width) + 'px';
+                    session_div.style.top = (session.lane * 100 + 3) + 'px';
+                    // Wrap the title at the screen edge, not the (possibly off-screen) chip edge
+                    let text_div = document.createElement("div");
+                    text_div.innerText = session.name;
+                    text_div.style.maxWidth = Math.max(50, window.innerWidth - 200 - session.position - 20) + 'px';
+                    session_div.append(text_div);
                     div.append(session_div);
                 })
                 schedule.append(div);
@@ -482,15 +501,9 @@
                 gridlines.append(line);
             });
 
-            if (!animation_started) {
-                animation_started = true;
-                start_animation();
-            } else {
-                // Fresh rows: restart the scroll from the top of its cycle so the
-                // rebuild never lands mid-slide
-                animation.cancel();
-                animation.play();
-            }
+            // (Re)start the scroll cycle sized to the new first row, so a data
+            // rebuild never lands mid-slide
+            make_animation();
         }
         load();
 
