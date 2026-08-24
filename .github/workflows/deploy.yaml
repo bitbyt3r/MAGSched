@@ -28,7 +28,7 @@ jobs:
       - name: Build shared package
         run: |
           pip install --target package -r requirements.txt
-          cp frontend.py loader.py guidebook.py models.py config.py package/
+          cp *.py package/
           cp -r templates static package/
           cd package
           zip -r ../lambda.zip .
