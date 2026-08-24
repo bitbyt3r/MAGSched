@@ -39,7 +39,7 @@ To pull a real cache locally, set `CACHE_FILE`, `GUIDEBOOK_API_KEY`, and `GUIDEB
 * [/display](/display) - Panel displays: a broadcast overlay showing the next session in a room
 * [/upnext](/upnext) - Up next displays: the next session in a room (counting one that started under 15 minutes ago)
 * [/room](/room) - Room displays: the session currently running in a room, with its description
-* [/tvguide](/tvguide) - A scrolling TV-guide-style schedule grid of all rooms, styled like a classic 480i cable guide channel. Add `?scanlines=off` to disable the CRT effects.
+* [/tvguide](/tvguide) - A scrolling TV-guide-style schedule grid of all rooms, styled like a classic 480i cable guide channel. Hours in which no session starts are skipped, with a thick break line marking the gap (long-running sessions spanning a gap are compressed across it). Add `?scanlines=off` to disable the CRT effects.
 
 Each of `/display`, `/upnext`, and `/room` lists the locations to choose from.
 
