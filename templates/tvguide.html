@@ -176,11 +176,6 @@
             text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
         }
 
-        .session .stime {
-            color: #ffe14d;
-            padding-right: 10px;
-        }
-
         #slider {
             position: relative;
             display: flex;
@@ -304,11 +299,9 @@
     </div>
     <svg width="0" height="0" style="position:absolute">
         <filter id="crt-warp" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
-            <feImage id="warpmap" x="0" y="0" href="data:image/png;base64,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" preserveAspectRatio="none" result="map" />
-            <feDisplacementMap in="SourceGraphic" in2="map" scale="22" xChannelSelector="R" yChannelSelector="G" result="warped" />
-            <feColorMatrix in="warped" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r" />
-            <feColorMatrix in="warped" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g" />
-            <feColorMatrix in="warped" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b" />
+            <feColorMatrix in="SourceGraphic" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r" />
+            <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g" />
+            <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b" />
             <feOffset in="r" dx="1.2" dy="0" result="ro" />
             <feOffset in="b" dx="-1.2" dy="0" result="bo" />
             <feBlend in="ro" in2="g" mode="screen" result="rg" />
@@ -321,14 +314,6 @@
         if (["off", "false", "0", "no"].includes((params.get("scanlines") || "").toLowerCase())) {
             document.body.classList.add("no-fx");
         }
-
-        function size_warpmap() {
-            let map = document.getElementById("warpmap");
-            map.setAttribute("width", window.innerWidth);
-            map.setAttribute("height", window.innerHeight);
-        }
-        size_warpmap();
-        window.addEventListener("resize", size_warpmap);
 
         let schedule = document.getElementById("schedule");
         let gridlines = document.getElementById("gridlines");
@@ -465,10 +450,7 @@
                 renderable.forEach((session) => {
                     let session_div = document.createElement("div");
                     session_div.classList.add("session");
-                    let time_span = document.createElement("span");
-                    time_span.classList.add("stime");
-                    time_span.innerText = new Date(session.start_time).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
-                    session_div.append(time_span, document.createTextNode(session.name));
+                    session_div.innerText = session.name;
                     session_div.style.left = Math.round(session.position) + 'px';
                     session_div.style.width = Math.round(session.width) + 'px';
                     div.append(session_div);
