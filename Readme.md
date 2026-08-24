@@ -20,7 +20,8 @@ Environment variables:
 * `CACHE_BUCKET` / `CACHE_KEY` / `FRAB_KEY` - S3 locations of the cache and the pregenerated Frab feed (defaults: `magsched-cache` / `cache.json` / `frab.xml`)
 * `FRAB_URL` - When set, `/frab` redirects here (e.g. a public S3 object URL) instead of to a short-lived presigned URL
 * `CACHE_FILE` - When set, read/write the cache from this local file instead of S3 (local development)
-* `TIME_LOOP` - Set to `true` to replay the cached schedule endlessly, shifted onto the current time (for testing displays)
+* `TIME_LOOP` - Set to `true` to replay the cached schedule endlessly, shifted onto the current time (for testing displays). The cycle advances in whole days, so sessions keep their real clock times.
+* `TIME_LOOP_OFFSET` - Seconds added to the clock before the loop calculation, to jump the replay to a different point in the schedule (e.g. `-115200` shows the con as it was 32 hours earlier in the cycle)
 * `TIME_ZONE_NAME` - Timezone used for display and the Frab feed (default `America/New_York`)
 * `ACRONYM`, `TITLE`, `START`, `END`, `DAYS`, `TIMESLOT_DURATION`, `BASE_URL` - Conference metadata included in the `/frab` feed
 

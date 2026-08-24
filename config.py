@@ -1,6 +1,9 @@
 import os
 
 time_loop = os.environ.get("TIME_LOOP", "false").lower() == "true"
+# Seconds added to the clock before the TIME_LOOP calculation: jump the replay
+# to a different point in the schedule (e.g. -115200 shows the con as it was 32h earlier).
+time_loop_offset = float(os.environ.get("TIME_LOOP_OFFSET", "0"))
 
 cache_bucket = os.environ.get("CACHE_BUCKET", "magsched-cache")
 cache_key = os.environ.get("CACHE_KEY", "cache.json")

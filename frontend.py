@@ -71,7 +71,9 @@ def shift_onto_now(sessions):
     start = min(x.start_time for x in sessions)
     end = max(x.end_time for x in sessions)
     cycle = datetime.timedelta(days=max(1, -(-(end - start) // datetime.timedelta(days=1))))
-    time_offset = cycle * ((datetime.datetime.now(datetime.UTC) - start) // cycle)
+    skew = datetime.timedelta(seconds=config.time_loop_offset)
+    now = datetime.datetime.now(datetime.UTC) + skew
+    time_offset = cycle * ((now - start) // cycle) - skew
     for session in sessions:
         session.start_time += time_offset
         session.end_time += time_offset

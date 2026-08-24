@@ -68,3 +68,29 @@ def test_cache_not_mutated_by_frab(client):
     before = [x["id"] for x in client.get("/sessions?limit=-1&sort=id").json]
     client.get("/frab")
     assert [x["id"] for x in client.get("/sessions?limit=-1&sort=id").json] == before
+
+
+def test_time_loop_offset(monkeypatch):
+    import datetime
+    import json
+
+    import config
+    import frontend
+    import models
+
+    with open(__file__.replace("test_search.py", "fixture_cache.json")) as f:
+        data = json.load(f)
+
+    cycle = datetime.timedelta(days=2)  # fixture spans 29h, rounded up to whole days
+    starts = {}
+    for offset in [0, -86400]:
+        monkeypatch.setattr(config, "time_loop_offset", offset)
+        sessions = [models.Session.extract(x) for x in data["sessions"]]
+        frontend.shift_onto_now(sessions)
+        starts[offset] = min(x.start_time for x in sessions)
+        # The real clock always lands inside the shifted cycle window
+        now = datetime.datetime.now(datetime.UTC)
+        assert datetime.timedelta(0) <= now - starts[offset] < cycle
+    # A negative offset rewinds the replay: the schedule shifts later by exactly
+    # that amount, modulo whole cycles
+    assert (starts[0] - starts[-86400] - datetime.timedelta(seconds=-86400)) % cycle == datetime.timedelta(0)
