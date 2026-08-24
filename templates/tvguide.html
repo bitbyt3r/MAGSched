@@ -412,6 +412,17 @@
                 locations_lookup[location.id] = location;
             })
             sessions = await fetch("/sessions?limit=-1&time_range_start=-5400&time_range_end=+28800").then(res => res.json());
+            // Apply the new data in the background: never interrupt a slide in progress
+            if (animation && animation.playState === "running" && animation.currentTime > 1900) {
+                setTimeout(render, 2600 - animation.currentTime + 150);
+            } else {
+                render();
+            }
+        }
+
+        function render() {
+            // Keep cycling from wherever the rotation currently is
+            let top_location = schedule.children.length ? schedule.children[0].dataset.location : null;
             sessions_by_location = {};
             visible_locations = [];
             let now = new Date().getTime() / 1000;
@@ -430,9 +441,9 @@
                 }
                 sessions_by_location[location].push(session);
             })
-            locations_el.replaceChildren();
-            schedule.replaceChildren();
             timeline.replaceChildren();
+            let new_rows = [];
+            let new_names = [];
 
             for (const [location, sessions_in_location] of Object.entries(sessions_by_location)) {
                 let renderable = sessions_in_location.filter((session) => {
@@ -455,12 +466,13 @@
                 });
                 let div = document.createElement("div");
                 div.classList.add("schedulerow");
+                div.dataset.location = location;
                 div.style.height = lanes.length * 100 + 'px';
                 let location_div = document.createElement("div");
                 location_div.classList.add("locationname");
                 location_div.style.height = (lanes.length * 100 - 6) + 'px';
                 location_div.innerText = locations_lookup[location].name.split(' (')[0];
-                locations_el.append(location_div);
+                new_names.push(location_div);
                 renderable.forEach((session) => {
                     let session_div = document.createElement("div");
                     session_div.classList.add("session");
@@ -474,8 +486,19 @@
                     session_div.append(text_div);
                     div.append(session_div);
                 })
-                schedule.append(div);
+                new_rows.push(div);
             }
+
+            // Re-apply the previous rotation so reloads are invisible; if that room
+            // vanished from the window, resume from the next room after it
+            let ids = new_rows.map((row) => row.dataset.location);
+            let idx = top_location === null ? 0 : ids.indexOf(top_location);
+            if (idx === -1) {
+                idx = ids.findIndex((id) => Number(id) > Number(top_location));
+                if (idx === -1) idx = 0;
+            }
+            schedule.replaceChildren(...new_rows.slice(idx), ...new_rows.slice(0, idx));
+            locations_el.replaceChildren(...new_names.slice(idx), ...new_names.slice(0, idx));
 
             gridlines.replaceChildren();
             axis.segs.forEach((seg) => {
