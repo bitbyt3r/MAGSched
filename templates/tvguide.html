@@ -372,19 +372,24 @@
         }
 
         var animation = null;
+        var animation_hold = 2000;
+        var animation_duration = 2600;
 
-        // Slide up by the height of whatever row is currently on top (rows are
-        // taller when concurrent sessions stack into extra lanes)
+        // Slide up by the height of whatever row is currently on top, holding for
+        // 2s per displayed lane so taller rooms get proportionally more read time
         function make_animation() {
             if (animation) {
                 animation.cancel();
             }
             let distance = schedule.children.length ? schedule.children[0].offsetHeight : 100;
+            let lanes = Math.max(1, Math.round(distance / 100));
+            animation_hold = 2000 * lanes;
+            animation_duration = animation_hold + 600;
             animation = slider.animate([
                 { transform: "translateY(0)", offset: 0 },
-                { transform: "translateY(0)", offset: 0.77, easing: "ease-in-out" },
+                { transform: "translateY(0)", offset: animation_hold / animation_duration, easing: "ease-in-out" },
                 { transform: "translateY(-" + distance + "px)", offset: 1 },
-            ], { duration: 2600, iterations: 1 });
+            ], { duration: animation_duration, iterations: 1 });
             animation.addEventListener("finish", advance);
         }
 
@@ -413,8 +418,8 @@
             })
             sessions = await fetch("/sessions?limit=-1&time_range_start=-5400&time_range_end=+28800").then(res => res.json());
             // Apply the new data in the background: never interrupt a slide in progress
-            if (animation && animation.playState === "running" && animation.currentTime > 1900) {
-                setTimeout(render, 2600 - animation.currentTime + 150);
+            if (animation && animation.playState === "running" && animation.currentTime > animation_hold - 100) {
+                setTimeout(render, animation_duration - animation.currentTime + 150);
             } else {
                 render();
             }
@@ -423,6 +428,7 @@
         function render() {
             // Keep cycling from wherever the rotation currently is
             let top_location = schedule.children.length ? schedule.children[0].dataset.location : null;
+            let top_name = locations_el.children.length ? locations_el.children[0].innerText : null;
             sessions_by_location = {};
             visible_locations = [];
             let now = new Date().getTime() / 1000;
@@ -445,7 +451,10 @@
             let new_rows = [];
             let new_names = [];
 
-            for (const [location, sessions_in_location] of Object.entries(sessions_by_location)) {
+            let ordered = Object.keys(sessions_by_location).sort((a, b) =>
+                locations_lookup[a].name.localeCompare(locations_lookup[b].name));
+            for (const location of ordered) {
+                let sessions_in_location = sessions_by_location[location];
                 let renderable = sessions_in_location.filter((session) => {
                     if (session.position < 0) {
                         session.width = session.width + session.position;
@@ -494,7 +503,7 @@
             let ids = new_rows.map((row) => row.dataset.location);
             let idx = top_location === null ? 0 : ids.indexOf(top_location);
             if (idx === -1) {
-                idx = ids.findIndex((id) => Number(id) > Number(top_location));
+                idx = new_names.findIndex((name_div) => name_div.innerText.localeCompare(top_name) > 0);
                 if (idx === -1) idx = 0;
             }
             schedule.replaceChildren(...new_rows.slice(idx), ...new_rows.slice(0, idx));
