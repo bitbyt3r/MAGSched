@@ -39,6 +39,9 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "*"
+    if response.mimetype == "text/html":
+        # Signage boxes must pick up new pages on reload, not heuristically cache them
+        response.headers["Cache-Control"] = "no-cache"
     return response
 
 
@@ -58,16 +61,17 @@ def load_cache():
 
 
 def shift_onto_now(sessions):
-    """TIME_LOOP: replay the schedule endlessly by shifting it forward onto the current time."""
+    """TIME_LOOP: replay the schedule endlessly by shifting it forward onto the current time.
+
+    The cycle length is the schedule's span rounded up to whole days, so shifted
+    times keep their real clock time and each real day replays one schedule day.
+    """
     if not sessions:
         return
     start = min(x.start_time for x in sessions)
     end = max(x.end_time for x in sessions)
-    event_duration = end - start
-    if not event_duration:
-        return
-    time_since_start = datetime.datetime.now(datetime.UTC) - start
-    time_offset = event_duration * (time_since_start // event_duration)
+    cycle = datetime.timedelta(days=max(1, -(-(end - start) // datetime.timedelta(days=1))))
+    time_offset = cycle * ((datetime.datetime.now(datetime.UTC) - start) // cycle)
     for session in sessions:
         session.start_time += time_offset
         session.end_time += time_offset
