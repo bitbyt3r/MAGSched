@@ -8,7 +8,7 @@ The main goal is to avoid any API usage limits that external providers impose by
 
 Two AWS Lambda functions share one deployment package, built and deployed by `.github/workflows/deploy.yaml` on pushes to `main` (tests run first, and on every pull request):
 
-* **`magsched_guidebook_loader`** (`loader.lambda_handler`) — invoked on a schedule; pulls sessions, locations, and schedule tracks from the Guidebook Open API and writes `cache.json` to S3. A failed refresh raises (visible in CloudWatch) and leaves the previous cache in place.
+* **`magsched_guidebook_loader`** (`loader.lambda_handler`) — invoked on a schedule; pulls sessions, locations, and schedule tracks from the Guidebook Open API and writes `cache.json` plus a pregenerated `frab.xml` to S3. A failed refresh raises (visible in CloudWatch) and leaves the previous cache in place.
 * **`magsched_guidebook_frontend`** (`frontend.lambda_handler`) — a Flask app served through API Gateway via `apig-wsgi`; reads `cache.json` from S3 (memoized for ~15 seconds per warm container) and serves the API and display pages below.
 
 ## Configuration
@@ -17,7 +17,8 @@ Environment variables:
 
 * `GUIDEBOOK_API_KEY` - Guidebook Open API key (loader only). Guidebook does not have permission controls on API keys, so be very careful with them.
 * `GUIDEBOOK_GUIDE` - The guide number to pull, as a string
-* `CACHE_BUCKET` / `CACHE_KEY` - S3 location of the cache (defaults: `magsched-cache` / `cache.json`)
+* `CACHE_BUCKET` / `CACHE_KEY` / `FRAB_KEY` - S3 locations of the cache and the pregenerated Frab feed (defaults: `magsched-cache` / `cache.json` / `frab.xml`)
+* `FRAB_URL` - When set, `/frab` redirects here (e.g. a public S3 object URL) instead of to a short-lived presigned URL
 * `CACHE_FILE` - When set, read/write the cache from this local file instead of S3 (local development)
 * `TIME_LOOP` - Set to `true` to replay the cached schedule endlessly, shifted onto the current time (for testing displays)
 * `TIME_ZONE_NAME` - Timezone used for display and the Frab feed (default `America/New_York`)
@@ -143,7 +144,7 @@ Returns a single track by ID:
 
 ### GET /frab
 
-Returns the complete schedule in XML/Frab format.
+Redirects (302) to the complete schedule in XML/Frab format, pregenerated in S3 on every loader refresh. Consumers must follow redirects. (In local development with `CACHE_FILE` set, the XML is generated and returned directly.)
 
 ### GET /frab/filtered
 

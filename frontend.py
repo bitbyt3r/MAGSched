@@ -3,20 +3,16 @@ import gzip
 import json
 import time
 import traceback
-import uuid
-import xml.etree.ElementTree as ET
-import zoneinfo
-from html.parser import HTMLParser
 
-from flask import Flask, jsonify, make_response, render_template, request
+from flask import Flask, jsonify, make_response, redirect, render_template, request
 
 import config
 import models
+from frab import TZ, sessions_to_frab, strip_html
 
 app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 3600
 cache = {}
-TZ = zoneinfo.ZoneInfo(config.time_zone_name)
 
 
 COMPRESS_MIN_BYTES = 102400
@@ -46,31 +42,18 @@ def add_cors_headers(response):
     return response
 
 
-class _TextExtractor(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.parts = []
-
-    def handle_data(self, data):
-        self.parts.append(data)
-
-
-def strip_html(text):
-    if not text:
-        return ""
-    parser = _TextExtractor()
-    parser.feed(text)
-    return "".join(parser.parts)
+def s3_client():
+    if "s3" not in cache:
+        import boto3
+        cache["s3"] = boto3.client("s3")
+    return cache["s3"]
 
 
 def load_cache():
     if config.cache_file:
         with open(config.cache_file) as filehandle:
             return json.load(filehandle)
-    if "s3" not in cache:
-        import boto3
-        cache["s3"] = boto3.client("s3")
-    data = cache["s3"].get_object(Bucket=config.cache_bucket, Key=config.cache_key)['Body'].read()
+    data = s3_client().get_object(Bucket=config.cache_bucket, Key=config.cache_key)['Body'].read()
     return json.loads(data)
 
 
@@ -224,75 +207,6 @@ def tvguide():
     return render_template("tvguide.html", schedule_host=config.base_url.split("//")[-1])
 
 
-def make_guid(collection, id):
-    return str(uuid.uuid3(uuid.NAMESPACE_URL, f"{config.base_url}/{collection}/{id}"))
-
-
-EVENT_TAGS = [
-    "date", "start", "duration", "room", "slug", "url", "title", "subtitle", "track",
-    "type", "language", "abstract", "description", "logo", "persons", "links", "attachments"
-]
-
-
-def sessions_to_frab(sessions):
-    location_lookup = {x.id: x for x in get_collection("locations")}
-    schedule = ET.Element("schedule")
-    ET.SubElement(schedule, "generator", name="magsched", version="1.0")
-    ET.SubElement(schedule, "version").text = "Guidebook"
-    conference = ET.SubElement(schedule, "conference")
-    for tagname in ["acronym", "title", "start", "end", "days", "timeslot_duration", "time_zone_name", "base_url"]:
-        ET.SubElement(conference, tagname).text = getattr(config, tagname)
-    days = {}
-    for session in sessions:
-        local_start = session.start_time.astimezone(TZ)
-        day = local_start.strftime("%Y-%m-%d")
-        if day not in days:
-            days[day] = {
-                "date": day,
-                "start": local_start.replace(hour=0, minute=0, second=0, microsecond=0).isoformat(),
-                "end": local_start.replace(hour=23, minute=45, second=0, microsecond=0).isoformat(),
-                "rooms": {}
-            }
-        description = strip_html(session.description)
-        duration = int((session.end_time - session.start_time).total_seconds())
-        for location in session.locations:
-            if location not in location_lookup:
-                print(f"session {session.id} has invalid location {location}")
-                continue
-            room = days[day]["rooms"].setdefault(location, {
-                "id": location,
-                "name": location_lookup[location].name,
-                "events": []
-            })
-            room["events"].append({
-                "id": session.id,
-                "date": local_start.isoformat(),
-                "start": local_start.strftime("%H:%M"),
-                "duration": f"{duration // 3600}:{(duration % 3600) // 60:02}",
-                "room": room["name"],
-                "slug": f"{config.acronym}-{session.id}-sess",
-                "url": f"{config.base_url}/sessions/{session.id}",
-                "title": session.name,
-                "track": session.tracks[0] if session.tracks else "",
-                "language": "en",
-                "abstract": description,
-                "description": description,
-                "logo": "https://www.magfest.org/assets/logo_magfest_lg.png",
-            })
-    for idx, day in enumerate(sorted(days.values(), key=lambda x: x['start'])):
-        day_tag = ET.SubElement(schedule, "day", date=day['date'], end=day['end'], index=str(idx + 1), start=day['start'])
-        for room in day['rooms'].values():
-            room_tag = ET.SubElement(day_tag, "room", guid=make_guid("locations", room['id']), name=room['name'])
-            for event in room['events']:
-                event_tag = ET.SubElement(room_tag, "event", guid=make_guid("sessions", event['id']), id=str(event['id']))
-                for tagname in EVENT_TAGS:
-                    ET.SubElement(event_tag, tagname).text = event.get(tagname, "")
-                recording = ET.SubElement(event_tag, "recording")
-                ET.SubElement(recording, "license")
-                ET.SubElement(recording, "optout").text = "false"
-    return '<?xml version="1.0" encoding="utf-8"?>\n' + ET.tostring(schedule, encoding="unicode")
-
-
 def xml_response(body):
     response = make_response(body)
     response.mimetype = "text/xml"
@@ -301,17 +215,25 @@ def xml_response(body):
 
 @app.route("/frab")
 def frab():
-    if time.time() - cache.get("frab-age", 0) > 60:
+    # The loader pregenerates frab.xml in S3; redirect consumers straight to it.
+    if config.frab_url:
+        return redirect(config.frab_url)
+    if config.cache_file:
+        # Local development without S3: generate on the fly.
         sessions = sorted(get_collection("sessions"), key=lambda x: x.start_time)
-        cache["frab"] = sessions_to_frab(sessions)
-        cache["frab-age"] = time.time()
-    return xml_response(cache["frab"])
+        return xml_response(sessions_to_frab(sessions, get_collection("locations")))
+    url = s3_client().generate_presigned_url(
+        "get_object",
+        Params={"Bucket": config.cache_bucket, "Key": config.frab_key},
+        ExpiresIn=600,
+    )
+    return redirect(url)
 
 
 @app.route("/frab/filtered")
 def frab_filtered():
     results = [models.Session.extract(x) for x in search("sessions", default_limit=-1)]
-    return xml_response(sessions_to_frab(results))
+    return xml_response(sessions_to_frab(results, get_collection("locations")))
 
 
 from apig_wsgi import make_lambda_handler

@@ -18,3 +18,6 @@ days = os.environ.get("DAYS", "4")
 timeslot_duration = os.environ.get("TIMESLOT_DURATION", "00:15")
 time_zone_name = os.environ.get("TIME_ZONE_NAME", "America/New_York")
 base_url = os.environ.get("BASE_URL", "https://schedule.magfest.net")
+frab_key = os.environ.get("FRAB_KEY", "frab.xml")
+# When set, /frab redirects here instead of to a presigned S3 URL (e.g. a public object URL).
+frab_url = os.environ.get("FRAB_URL", "")

@@ -10,8 +10,8 @@ Minimalist schedule cache for MAGFest. A loader Lambda pulls Guidebook into `s3:
 
 ## Layout
 
-- `frontend.py` - every HTTP route, the search/filter engine, and Frab XML generation
-- `loader.py` + `guidebook.py` - ingest; `models.py` - Session/Location/Track; `config.py` - env vars
+- `frontend.py` - every HTTP route and the search/filter engine; `/frab` redirects to the pregenerated S3 object
+- `loader.py` + `guidebook.py` - ingest (writes `cache.json` + `frab.xml` to S3); `frab.py` - Frab XML generation; `models.py` - Session/Location/Track; `config.py` - env vars
 - `templates/signage.html` - single template behind `/display`, `/upnext`, and `/room`, parameterized by `mode`
 - `tests/fixture_cache.json` - offline cache fixture with edge cases (null description, empty/unknown locations, >24h session, non-numeric id)
 
